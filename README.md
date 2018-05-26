@@ -1,7 +1,7 @@
 # pfadaeffchen
 Network render service for Autodesk Maya
 
-[![Latest PyPI version](https://img.shields.io/badge/version-v0.95-blue.svg)](https://github.com/tappi287/pfadaeffchen/releases) [![GitHub license](https://img.shields.io/github/license/tappi287/pfadaeffchen.svg)
+[![Latest PyPI version](https://img.shields.io/badge/version-v0.95-blue.svg)](https://github.com/tappi287/pfadaeffchen/releases) ![GitHub license](https://img.shields.io/github/license/tappi287/pfadaeffchen.svg)
 
 Creates a matte for every material in your Maya scene and outputs a layered PSD file.
 
@@ -32,4 +32,4 @@ The packages listed in the ''requirements.txt'' are needed to run the applicatio
 
 ### License
 The GUI application is following the PyQt5 license, releasing under GPLv3.
-Modules inside the ''maya_mod'' folder are availabe under the MIT license since they are executed separately in Maya's bundled mayapy Python interpreter.
+Modules inside the `maya_mod` folder are availabe under the MIT license since they are executed separately in Maya's bundled mayapy Python interpreter.
