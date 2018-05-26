@@ -35,7 +35,7 @@ from gettext import gettext, translation
 from PyQt5 import QtWidgets, QtCore
 from PyQt5.uic import loadUi
 
-from modules.detect_lang import get_ms_windows_language
+from modules.detect_lang import get_ms_windows_language, get_translation
 from modules.gui_control_app import ControlApp
 from modules.setup_log import setup_logging, setup_log_file
 from modules.setup_paths import get_current_modules_dir
@@ -45,7 +45,7 @@ from modules.app_globals import *
 os.environ.setdefault('LANGUAGE', get_ms_windows_language()[:2])
 
 # translate strings
-de = translation('pfad_aeffchen', localedir='locale')
+de = get_translation()
 de.install()
 _ = de.gettext
 

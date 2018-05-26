@@ -31,7 +31,7 @@ from datetime import datetime
 from PyQt5 import QtWidgets, QtCore
 from PyQt5.uic import loadUi
 
-from modules.detect_lang import get_ms_windows_language
+from modules.detect_lang import get_ms_windows_language, get_translation
 from modules.setup_log import setup_logging, setup_log_file
 from modules.socket_server import run_watcher_server
 from maya_mod.socket_client import send_message
@@ -42,7 +42,7 @@ from modules.app_globals import *
 os.environ.setdefault('LANGUAGE', get_ms_windows_language()[:2])
 
 # translate strings
-de = translation('pfad_aeffchen', localedir='locale')
+de = get_translation()
 de.install()
 _ = de.gettext
 

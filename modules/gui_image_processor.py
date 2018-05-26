@@ -25,7 +25,7 @@ from gettext import translation
 from pathlib import Path
 from PyQt5 import QtCore
 
-from modules.detect_lang import get_ms_windows_language
+from modules.detect_lang import get_ms_windows_language, get_translation
 from modules.app_globals import *
 from maya_mod.start_mayapy import run_module_in_standalone
 
@@ -33,8 +33,7 @@ from maya_mod.start_mayapy import run_module_in_standalone
 os.environ.setdefault('LANGUAGE', get_ms_windows_language()[:2])
 
 # translate strings
-de = translation('pfad_aeffchen', localedir='locale')
-de.install()
+de = get_translation()
 _ = de.gettext
 
 def file_is_locked(file_path):

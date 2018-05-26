@@ -20,8 +20,11 @@
         You should have received a copy of the GNU General Public License
         along with Pfad Aeffchen.  If not, see <http://www.gnu.org/licenses/>.
 """
+import os
 import locale
 import ctypes
+from gettext import translation
+from modules.setup_paths import get_current_modules_dir
 
 
 def get_ms_windows_language():
@@ -43,3 +46,8 @@ def get_ms_windows_language():
         lang = 'en'
 
     return lang
+
+
+def get_translation():
+    locale_dir = os.path.join(get_current_modules_dir(), 'locale')
+    return translation('pfad_aeffchen', localedir=locale_dir)
