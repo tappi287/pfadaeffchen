@@ -1,0 +1,357 @@
+# Pfad Aeffchen English
+# Copyright (C) 2018 Tappi Inc.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"POT-Creation-Date: 2018-05-25 21:22+0200\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=cp1252\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: pygettext.py 1.5\n"
+
+
+#: modules\gui_control_app.py:223
+msgid "Installierte Maya Versionen: {}"
+msgstr "Installed Maya Versions: {}"
+
+#: modules\gui_control_app.py:233 modules\gui_service_manager.py:94
+msgid "Kein Job"
+msgstr "No job"
+
+#: modules\gui_control_app.py:265
+msgid "Füge Benutzer IP Subnetze hinzu:<br>"
+msgstr "Add user defined IP subnets:<br>"
+
+#: modules\gui_control_app.py:272
+msgid "Der Render Service muss neugestartet werden."
+msgstr "The Render service needs to be restarted."
+
+#: modules\gui_control_app.py:435
+msgid "Render Service abschalten"
+msgstr "Disable Render service"
+
+#: modules\gui_control_app.py:439
+msgid "Render Service einschalten"
+msgstr "Enable Render service"
+
+#: modules\gui_control_app.py:453
+msgid "Render Service wird nicht mehr im Netzwerk angeboten."
+msgstr "Render service will no longer be broadcasted to the network."
+
+#: modules\gui_control_app.py:519
+msgid "<b>{} fertiggestellt. PSD Datei erstellt.</b>"
+msgstr "<b>{} finished. PSD file created.</b>"
+
+#: modules\gui_control_app.py:620
+msgid "Render Service beendet."
+msgstr "Render service ended."
+
+#: modules\gui_control_app.py:624
+msgid "Service Manager beendet."
+msgstr "Service manager ended."
+
+#: modules\gui_control_app.py:629
+msgid "Socket Senden Server beendet."
+msgstr "Socket send server ended."
+
+#: modules\gui_control_app.py:636
+msgid "Socket Empfangs Server beendet."
+msgstr "Socket receive server ended."
+
+#: modules\gui_control_app.py:645
+msgid "Bild Beobachter beendet."
+msgstr "Image watcher ended."
+
+#: modules\gui_image_processor.py:65
+msgid "KeineSzenenDatei"
+msgstr "NoSceneFile"
+
+#: modules\gui_image_processor.py:98
+msgid "Bilderkennung verfügt über {0:02d} parallel ausführbare Threads auf dieser Maschine. {1:02d} Threads aktiv."
+msgstr "There are {0:02d} parallel threads available for image detection on this machine. {1:02d} threads active."
+
+#: modules\gui_image_processor.py:111
+msgid "Ordnerüberwachung eingestellt."
+msgstr "Directory watch disabled."
+
+#: modules\gui_image_processor.py:141
+msgid "Bild Daten Beobachter Verzeichnis gesetzt: {0:02d} bereits exsitierende Dateien gefunden."
+msgstr "Image detection directory set: {0:02d} already existing files found."
+
+#: modules\gui_image_processor.py:166
+msgid "PSD wird erstellt."
+msgstr "PSD file will be created."
+
+#: modules\gui_image_processor.py:166
+msgid "_Pfade.psd"
+msgstr "_Paths.psd"
+
+#: modules\gui_image_processor.py:180
+msgid "PSD Erstellung abgeschlossen für {}."
+msgstr "PSD creation finished for {}."
+
+#: modules\gui_image_processor.py:196
+msgid "Überwache Ordner: <b>{}</b>"
+msgstr "Watching directory: <b>{}</b>"
+
+#: modules\gui_image_processor.py:202
+msgid "Szenendatei geändert zu: {}"
+msgstr "Scene file changed to: {}"
+
+#: modules\gui_image_processor.py:251
+msgid "<i>{0}</i> zur Bilderkennung eingereiht. {1:02d}/{2:02d} Threads aktiv."
+msgstr "<i>{0}</i> added to image detection. {1:02d}/{2:02d} threads active."
+
+#: modules\gui_image_processor.py:344
+msgid "Kein Schreibzugriff auf {}"
+msgstr "No write access for {}"
+
+#: modules\gui_image_processor.py:356
+msgid ""
+"Fehler im Bilderkennungsprozess:\n"
+"{}"
+msgstr ""
+"Error while detecting image:\n"
+"{}"
+
+#: modules\gui_image_processor.py:360
+msgid "Bilderkennung abgeschlossen für {}. Bildinhalte erkannt."
+msgstr "Image detection finished for {}. Image content detected."
+
+#: modules\gui_image_processor.py:363
+msgid "Bilderkennung abgeschlossen für {}. <i>Keine Bildinhalte erkannt.</i>"
+msgstr "Image detection finished for {}. <i>No image content detected.</i>"
+
+#: modules\gui_image_processor.py:386
+msgid "Erstelle PSD Datei {}"
+msgstr "Creating PSD file {}"
+
+#: modules\gui_image_watcher_process.py:56
+msgid "Bilderkennungsprozess"
+msgstr "Image detection process"
+
+#: modules\gui_image_watcher_process.py:59
+msgid "Überwacht den Ausgabeordner, entfernt leere Bilddateien und erstellt abschließend eine PSD mit Ebenen."
+msgstr "Watches the output directory, deletes empty image files and creates a layered PSD file when finished."
+
+#: modules\gui_image_watcher_process.py:113
+msgid "Bilddatei erstellt: "
+msgstr "Image file created: "
+
+#: modules\gui_image_watcher_process.py:117
+msgid "PSD Erstellung abgeschlossen."
+msgstr "PSD creation finished."
+
+#: modules\gui_service_manager.py:381
+msgid "Render Dienst verfuegbar @ {} Maya Version: {}"
+msgstr "Render service available @ {} Maya version: {}"
+
+#: modules\gui_service_manager.py:385
+msgid "Render Dienst verfuegbar @ {}<br><span style=\"color:red;\">Die Client Version wird nicht unterstuetzt! RenderKnecht Aktualisierung erforderlich!</span>"
+msgstr "Render service available @ {}<br><span style=\"color:red;\">The client version is not supported! RenderKnecht update needed!</span>"
+
+#: modules\gui_service_manager.py:408
+msgid "Job #{0:02d} eingereiht in laufende Jobs."
+msgstr "Job #{0:02d} added to queue."
+
+#: modules\gui_service_manager.py:410
+msgid "<b>Job abgelehnt! </b><span style=\"color:red;\">Die Szenendatei oder das Ausgabeverzeichnis sind für den Server nicht verfügbar!</span>"
+msgstr "<b>Job rejected! </b><span style=\"color:red;\">The scene file or the output directory are not available to the server!</span>"
+
+#: modules\gui_service_manager.py:415
+msgid "Momentan im Rendervorgang: {0} - {1:03d} / {2:03d} Layer erzeugt.<br/>{3:02d} Jobs in der Warteschlange."
+msgstr "Currently rendering: {0} - {1:03d} / {2:03d} Layer created.<br/>{3:02d} Jobs in the queue."
+
+#: modules\gui_service_manager.py:444
+msgid "{} in Warteschlange bewegt."
+msgstr "{} moved inside the queue."
+
+#: modules\gui_service_manager.py:447
+msgid "Job mit index {} konnte nicht bewegt werden."
+msgstr "Job with index {} could not be moved."
+
+#: modules\gui_service_manager.py:456
+msgid "{} wird abgebrochen."
+msgstr "{} will be aborted."
+
+#: modules\gui_service_manager.py:458
+msgid "Job mit index {} konnte nicht abgebrochen werden."
+msgstr "Job with index {} could not be aborted."
+
+#: modules\job.py:29
+msgid "Szene wird vorbereitet"
+msgstr "Scene is being prepared."
+
+#: modules\job.py:29
+msgid "Warteschlange"
+msgstr "Queue"
+
+#: modules\job.py:30
+msgid "Bilderkennung"
+msgstr "Image detection"
+
+#: modules\job.py:30
+msgid "Rendering"
+msgstr "Rendering"
+
+#: modules\job.py:31
+msgid "Abgebrochen"
+msgstr "Canceled"
+
+#: modules\job.py:31
+msgid "Abgeschlossen"
+msgstr "Finished"
+
+#: modules\job.py:31
+msgid "Fehlgeschlagen"
+msgstr "Failed"
+
+#: modules\job.py:32
+msgid "Abbrechen"
+msgstr "Cancel"
+
+#: modules\job.py:32
+msgid "Ans Ende der Warteschlange"
+msgstr "Move to the end of the queue"
+
+#: modules\job.py:32
+msgid "Zum Anfang der Warteschlange"
+msgstr "Move to the start of the queue"
+
+#: modules\job.py:33
+msgid "Ausführen"
+msgstr "Apply"
+
+#: modules\job.py:94
+msgid "Unbekannt"
+msgstr "Unknown"
+
+#: modules\job.py:138
+msgid "{0:03d}/{1:03d} Layer erstellt"
+msgstr "{0:03d}/{1:03d} Layer created"
+
+#: modules\socket_broadcaster.py:70
+msgid "Pfad Aeffchen Dienst wird unter der Adresse {}:{} angeboten"
+msgstr "Pfad Aeffchen service is broadcasted at adress {}:{}"
+
+#: pfad_aeffchen.py:78
+msgid "Pfad zur CSB Datei *.csb oder zur MayaBinary *.mb angeben:"
+msgstr "Specify path to CSB file *.csb or to MayaBinary *.mb:"
+
+#: pfad_aeffchen.py:76
+msgid "{0}"
+msgstr "{1}"
+
+#: pfad_aeffchen.py:79
+msgid "Pfad zum Render Ausgabe Verzeichnis angeben:"
+msgstr "Specify path to the output directory:"
+
+#: pfad_aeffchen.py:80
+msgid "Gültige IP Subnetze"
+msgstr "Valid IP subnets"
+
+#: pfad_aeffchen.py:81
+msgid "Maya Version:"
+msgstr "Maya version:"
+
+#: pfad_aeffchen.py:82
+msgid "Renderer:"
+msgstr "Renderer:"
+
+#: pfad_aeffchen.py:83
+msgid "Warteschlange abarbeiten - De-/ oder Aktiviert die weitere Bearbeitung von Jobs in der Warteschlange"
+msgstr "Enable queue - dis-/ or enables further work on following jobs on the current queue"
+
+#: pfad_aeffchen.py:85
+msgid "Kein Verzeichnis festgelegt."
+msgstr "No directory choosen."
+
+#: pfad_aeffchen.py:86
+msgid "Keine Datei gewählt."
+msgstr "No file choosen."
+
+#: pfad_aeffchen.py:87
+msgid "Lokalen Job hinzufügen"
+msgstr "Add local job"
+
+#: pfad_aeffchen.py:88
+msgid "Render Service starten"
+msgstr "Start Render service"
+
+#: pfad_aeffchen.py:91
+msgid "Datei"
+msgstr "File"
+
+#: pfad_aeffchen.py:92
+msgid "Fenster"
+msgstr "Window"
+
+#: pfad_aeffchen.py:93
+msgid "Beenden"
+msgstr "Exit"
+
+#: pfad_aeffchen.py:94
+msgid "Bildprozess Fenster"
+msgstr "Image detection window"
+
+#: pfad_aeffchen.py:95
+msgid "Report speichern"
+msgstr "Save report"
+
+#: pfad_aeffchen.py:98
+msgid "Einführung"
+msgstr "Introduction"
+
+#: pfad_aeffchen.py:98
+msgid "Einstellungen"
+msgstr "Settings"
+
+#: pfad_aeffchen.py:98 pfad_aeffchen.py:183
+msgid "Lokaler Job"
+msgstr "Local job"
+
+#: pfad_aeffchen.py:103
+msgid "Ausgabeverzeichnis"
+msgstr "Output directory"
+
+#: pfad_aeffchen.py:103
+msgid "Job Titel"
+msgstr "Job title"
+
+#: pfad_aeffchen.py:103
+msgid "Progress"
+msgstr "Progress"
+
+#: pfad_aeffchen.py:103
+msgid "Szenendatei"
+msgstr "Scene file"
+
+#: pfad_aeffchen.py:104
+msgid "Bestätigung"
+msgstr "Confirmation"
+
+#: pfad_aeffchen.py:104
+msgid "Funktion"
+msgstr "Action"
+
+#: pfad_aeffchen.py:104
+msgid "Klient"
+msgstr "Client"
+
+#: pfad_aeffchen.py:219
+msgid "Szenendatei *.csb oder *.mb auswählen"
+msgstr "Choose scene file *.csb or *.mb"
+
+#: pfad_aeffchen.py:220
+msgid "DeltaGen CSB, Maya binary (*.csb;*.mb)"
+msgstr "DeltaGen CSB, Maya binary (*.csb;*.mb)"
+
+#: pfad_aeffchen.py:227
+msgid "Ausgabe Verzeichnis auswählen"
+msgstr "Choose output directory"
+

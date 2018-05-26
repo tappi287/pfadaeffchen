@@ -1,0 +1,11 @@
+{
+    "csb_import": {
+        "typ": "CSB_3DEXCITE", 
+        "options": "globalFrame=0;exportFrame=1;treatCsbUnitsAs=1;logMessages=0;exportLights=0;exportTextures=0;exportCameras=0;exportNormals=0;exportColorPerVertex=0;exportOptimizeNormalTol=0;importGeometryCleanUp=0;importVertexMergeTolerance=0.001;exportRttObjectNames=1;rotationOffset=-90=0=0;translationOffset=0=0=0;exportOptimizeMeshes=0;texEvaluate=0;importOptimize=0;importOptimizeVertTol=0;importOptimizeNormTol=0;importIgnoreUVs=0;importLodChildren=1;importLodIndex=1;importIgnoreShadowUVs=1;importUniqueNames=0;ignoreHiddenObject=1;importCameraSetup=1;animStart=1;animEnd=100;animStep=1;animFramesPerSec=30;animVertices=1;optAnimVertices=1;writeAnim=1;keyCurves=0;loop=0;timeslider=0;animEnabled=1;createInitiator=0;initiatorKey=1;"
+    }, 
+    "valid_maya_versions": [
+        "2017", 
+        "2016.5"
+    ], 
+    "modulepath": "Nextcloud/py/maya_scripts"
+}
