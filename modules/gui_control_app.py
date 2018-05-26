@@ -32,6 +32,7 @@ from functools import partial
 from gettext import translation
 from PyQt5 import QtCore, QtWidgets
 
+from modules.detect_lang import get_translation
 from modules.app_globals import AVAILABLE_RENDERER, SocketAddress, COMPATIBLE_VERSIONS
 from modules.gui_image_watcher_process import start_watcher
 from modules.gui_service_manager import ServiceManager
@@ -44,7 +45,7 @@ from modules.socket_client_3 import SendMessage
 from modules.socket_server import run_message_server
 
 # translate strings
-de = translation('pfad_aeffchen', localedir='locale')
+de = get_translation()
 _ = de.gettext
 
 
