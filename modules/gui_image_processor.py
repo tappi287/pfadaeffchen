@@ -19,22 +19,18 @@
         You should have received a copy of the GNU General Public License
         along with Pfad Aeffchen.  If not, see <http://www.gnu.org/licenses/>.
 """
-import os
 from time import sleep, time
-from gettext import translation
 from pathlib import Path
 from PyQt5 import QtCore
 
-from modules.detect_lang import get_ms_windows_language, get_translation
+from modules.detect_lang import get_translation
 from modules.app_globals import *
 from maya_mod.start_mayapy import run_module_in_standalone
-
-# get supported language
-os.environ.setdefault('LANGUAGE', get_ms_windows_language()[:2])
 
 # translate strings
 de = get_translation()
 _ = de.gettext
+
 
 def file_is_locked(file_path):
     """ Dirty method to check if a file is opened by another process on MS Windows """

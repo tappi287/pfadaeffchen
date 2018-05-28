@@ -19,6 +19,10 @@
         along with Pfad Aeffchen.  If not, see <http://www.gnu.org/licenses/>.
 """
 from datetime import datetime
+from modules.detect_lang import get_translation
+
+de = get_translation()
+_ = de.gettext
 
 
 class Job(object):

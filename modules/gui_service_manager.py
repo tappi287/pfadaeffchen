@@ -33,12 +33,17 @@ from PyQt5.QtCore import QThread, pyqtSignal, QTimer
 from PyQt5.QtCore import Qt
 
 from modules.job import Job
+from modules.detect_lang import get_translation
 from modules.setup_paths import get_user_directory, create_unique_render_path
 from modules.app_globals import SocketAddress, JOB_DATA_EOS
 from modules.socket_broadcaster import get_valid_network_address
 from modules.socket_server import run_service_manager_server as rsm_server
 from modules.app_globals import AVAILABLE_RENDERER
 
+# translate strings
+de = get_translation()
+de.install()
+_ = de.gettext
 
 def copy_job(job):
     """ Create a flat copy of a job item """

@@ -45,9 +45,13 @@ def get_ms_windows_language():
     if not lang.startswith('de'):
         lang = 'en'
 
-    return lang
+    # Return de or en
+    return lang[:2]
 
 
 def get_translation():
+    # get one of supported languages
+    os.environ.setdefault('LANGUAGE', get_ms_windows_language())
+
     locale_dir = os.path.join(get_current_modules_dir(), 'locale')
     return translation('pfad_aeffchen', localedir=locale_dir)

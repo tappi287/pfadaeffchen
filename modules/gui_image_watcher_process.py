@@ -38,9 +38,6 @@ from maya_mod.socket_client import send_message
 from modules.gui_image_processor import ImageFileWatcher
 from modules.app_globals import *
 
-# get one of supported languages
-os.environ.setdefault('LANGUAGE', get_ms_windows_language()[:2])
-
 # translate strings
 de = get_translation()
 de.install()

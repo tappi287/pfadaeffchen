@@ -6,9 +6,12 @@ from time import time
 from socket import socket, AF_INET, SOCK_DGRAM, SOL_SOCKET, SO_BROADCAST, gethostname, gethostbyname_ex, timeout
 from PyQt5 import QtCore
 
+from modules.detect_lang import get_translation
 from maya_mod.socket_client import send_message
 from modules.app_globals import SocketAddress
 
+de = get_translation()
+_ = de.gettext
 
 def get_valid_network_address(ip: str=None):
     """
