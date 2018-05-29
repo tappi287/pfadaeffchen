@@ -235,23 +235,25 @@ class ServiceManager(QThread):
         if not len(job_data) > 2:
             return False
 
-        global JOB_ITEM
-        JOB_ITEM = Job(*job_data)
+        job_item = Job(*job_data)
+
+        if not job_item.file or not job_item.render_dir:
+            return False
 
         if client:
-            JOB_ITEM.client = client
+            job_item.client = client
 
-        if not os.path.exists(JOB_ITEM.file):
+        if not os.path.exists(job_item.file):
             return False
-        if not os.path.exists(JOB_ITEM.render_dir):
+        if not os.path.exists(job_item.render_dir):
             return False
 
         self.invalidate_transfer_cache()
-        self.job_working_queue.append(JOB_ITEM)
+        self.job_working_queue.append(job_item)
 
-        JOB_ITEM.remote_index = len(self.job_queue)
-        self.job_queue.append(JOB_ITEM)
-        self.job_widget_signal.emit(JOB_ITEM)
+        job_item.remote_index = len(self.job_queue)
+        self.job_queue.append(job_item)
+        self.job_widget_signal.emit(job_item)
         self.start_job()
 
         return True

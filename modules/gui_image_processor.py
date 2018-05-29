@@ -54,6 +54,8 @@ class ImageFileWatcher(QtCore.QThread):
     status_signal = QtCore.pyqtSignal(str)
     psd_created_signal = QtCore.pyqtSignal()
 
+    led_signal = QtCore.pyqtSignal(int, int)
+
     # Scan interval in seconds
     interval = 6
 
@@ -77,11 +79,11 @@ class ImageFileWatcher(QtCore.QThread):
             self.scene_file_name = Path(scene_file).stem
 
         self.mod_dir = mod_dir
-        self.watcher_img_dict = parent.img_files
         self.parent = parent
 
         # Called when rendering is finished
         self.create_psd_requested = False
+        self.force_psd_creation = False
 
         # Prepare thread pool
         self.thread_pool = QtCore.QThreadPool(parent=self)
@@ -93,6 +95,7 @@ class ImageFileWatcher(QtCore.QThread):
         self.file_created_signal.connect(self.parent.file_created)
         self.file_removed_signal.connect(self.parent.file_removed)
         self.psd_created_signal.connect(self.parent.psd_created)
+        self.led_signal.connect(self.parent.led)
 
         # Init message
         self.status_signal.emit(_('Bilderkennung verfügt über {0:02d} parallel ausführbare '
@@ -100,11 +103,40 @@ class ImageFileWatcher(QtCore.QThread):
                                   '{1:02d} Threads aktiv.')
                                 .format(thread_count, self.thread_pool.activeThreadCount()))
 
-        self.img_dict = dict()
+        # Propertys
+        self.__img_files = dict()
+        self.__img_count = 0
+
+    @property
+    def watcher_img_dict(self):
+        return self.__img_files
+
+    @watcher_img_dict.setter
+    def watcher_img_dict(self, val):
+        self.__img_files.update(val)
+
+    @watcher_img_dict.deleter
+    def watcher_img_dict(self):
+        self.__img_files = dict()
+
+        # Reset image count
+        del self.img_count
+
+    @property
+    def img_count(self):
+        return self.__img_count
+
+    @img_count.setter
+    def img_count(self, val):
+        self.__img_count += val
+
+    @img_count.deleter
+    def img_count(self):
+        self.__img_count = 0
 
     def reset(self):
         self.create_psd_requested = False
-        del self.parent.img_files
+        del self.watcher_img_dict
 
     def deactivate_watch(self):
         self.watch_active = False
@@ -116,35 +148,55 @@ class ImageFileWatcher(QtCore.QThread):
             self.initial_directory_index()
 
         while not self.isInterruptionRequested():
+            # Red LED on while image detection threads active
+            if self.thread_pool.activeThreadCount() > 0:
+                self.led_signal.emit(0, 1)
+
             # Process output folder
             if self.watch_active:
+                self.led_signal.emit(2, 1)
                 self.watch_folder()
+                self.led_signal.emit(2, 2)
 
             # Check if rendering was finished and all images processed
             if self.create_psd_requested:
+                self.led_signal.emit(2, 1)
                 self.create_psd()
+                self.led_signal.emit(2, 2)
 
             self.sleep(self.interval)
+            self.led_signal.emit(1, 0)
 
         LOGGER.error('Image File Watcher thread ending.')
 
     def watch_folder(self):
-        self.img_dict = self.index_img_files(set_processed=False)
-        self.report_changes(self.img_dict)
-        self.watcher_img_dict = self.img_dict
+        img_dict = self.index_img_files(set_processed=False)
+        self.report_changes(img_dict)
+        self.watcher_img_dict = img_dict
 
     def initial_directory_index(self):
-        # Index existing files on initial start
+        # Index existing files on initial watch
         self.watcher_img_dict = self.index_img_files(set_processed=True)
+
         LOGGER.info('Image File Watcher directory changed. Found %s already existing files.',
                     len(self.watcher_img_dict))
-        self.status_signal.emit(_('Bild Daten Beobachter Verzeichnis gesetzt: '
-                                '{0:02d} bereits exsitierende Dateien gefunden.')
+        self.status_signal.emit(_('Initiale Ordnerindexierung abgeschlossen: '
+                                '{0:02d} bereits existierende Dateien gefunden.')
                                 .format(len(self.watcher_img_dict)))
 
-    def create_psd_request(self):
+        # Initial index finished, continue file watch
+        self.led_signal.emit(1, 0)
+        self.led_signal.emit(2, 0)
+        self.watch_active = True
+
+    def create_psd_request(self, force_psd_creation=False):
         """ Called from mother ship """
         self.create_psd_requested = True
+        self.force_psd_creation = force_psd_creation
+
+        if force_psd_creation:
+            self.status_signal.emit(_('PSD Erstellung wird erzwungen sobald Bilderkennungsthreads '
+                                      'abgeschlossen sind.'))
 
     def create_psd(self):
         """ Check that all images in the directory are processed and create layered PSD file """
@@ -153,6 +205,7 @@ class ImageFileWatcher(QtCore.QThread):
             return
 
         img_dict = self.watcher_img_dict
+        create_psd = False
         # TODO Detect zero images
 
         for __i in img_dict.items():
@@ -163,6 +216,10 @@ class ImageFileWatcher(QtCore.QThread):
                 break
         else:
             # Break never called - everything should be processed
+            create_psd = True
+
+        # Create psd if every image file is processed OR if force PSD creation requested
+        if create_psd or self.force_psd_creation:
             self.status_signal.emit(_('PSD wird erstellt.'))
 
             psd_file_name = self.scene_file_name + _('_Pfade.psd')
@@ -176,25 +233,30 @@ class ImageFileWatcher(QtCore.QThread):
             self.thread_pool.start(create_psd_runner)
 
             self.create_psd_requested = False
+            self.force_psd_creation = False
 
     def psd_created(self, psd_file):
         LOGGER.info('PSD File creation finished.')
         self.status_signal.emit(_('PSD Erstellung abgeschlossen für {}.').format(psd_file))
         self.psd_created_signal.emit()
+        self.led_signal.emit(0, 2)
 
-    def change_output_dir(self, dir):
-        """ Change watched directory and reset existing image entries
+    def change_output_dir(self, directory):
+        """
+            Change watched directory and reset existing image entries
             Called from parent process.
         """
-        # Reset process property
-        del self.parent.img_files
+        # Disable file watch until initial directory index
+        self.watch_active = False
 
-        self.output_dir = Path(dir)
+        # Reset process property
+        del self.watcher_img_dict
+
+        self.output_dir = Path(directory)
 
         if not self.output_dir.exists():
             self.output_dir.mkdir()
 
-        self.watch_active = True
         self.status_signal.emit(_('Überwache Ordner: <b>{}</b>').format(self.output_dir.as_posix()))
 
         self.initial_directory_index()
@@ -210,7 +272,14 @@ class ImageFileWatcher(QtCore.QThread):
             return img_dict
 
         for __img_file in self.output_dir.glob('*' + ImgParams.extension):
-            if __img_file.stat().st_size < 200:
+            try:
+                if __img_file.stat().st_size < 200:
+                    # Skip small files that are have just been written by the renderer
+                    # 4K empty iff image file should be at least 539 kB
+                    continue
+            except FileNotFoundError or OSError as e:
+                LOGGER.error('Error indexing image: %s', e)
+                # File probably deleted while watching, skip
                 continue
 
             # Image key
@@ -224,18 +293,24 @@ class ImageFileWatcher(QtCore.QThread):
         return img_dict
 
     def report_changes(self, current_img_dict):
-        self.file_created(current_img_dict)
-        self.file_removed(current_img_dict)
+        self.check_for_created_files(current_img_dict)
+        self.check_for_removed_files(current_img_dict)
 
-    def file_created(self, img_dict):
+    def check_for_created_files(self, img_dict):
         new_file_set = self.get_file_difference(old_dict=self.watcher_img_dict, new_dict=img_dict)
 
         if not new_file_set:
             return
 
         LOGGER.debug('Watcher found new files: %s', new_file_set)
-        self.file_created_signal.emit(new_file_set, len(img_dict))
 
+        # Add new files to created image count
+        self.img_count = len(new_file_set)
+
+        # Inform the parent thread
+        self.file_created_signal.emit(new_file_set, self.img_count)
+
+        # Start image detection process
         for img_key in new_file_set:
             img_file = img_dict.get(img_key).get('path')
 
@@ -254,7 +329,7 @@ class ImageFileWatcher(QtCore.QThread):
                                   '{1:02d}/{2:02d} Threads aktiv.').format(img_file.name, current_threads, max_threads)
                                 )
 
-    def file_removed(self, img_dict):
+    def check_for_removed_files(self, img_dict):
         rem_file_set = self.get_file_difference(old_dict=img_dict, new_dict=self.watcher_img_dict)
 
         if not rem_file_set:
@@ -263,7 +338,7 @@ class ImageFileWatcher(QtCore.QThread):
         LOGGER.debug('Watcher found removed files: %s', rem_file_set)
 
         # Reset watcher img dict
-        del self.parent.img_files
+        del self.watcher_img_dict
         self.watcher_img_dict = img_dict
 
         self.file_removed_signal.emit(rem_file_set)
@@ -301,6 +376,9 @@ class ImageFileWatcher(QtCore.QThread):
         # Update existing image dict
         self.watcher_img_dict = existing_imgs
 
+        # Switch Red LED off
+        self.led_signal.emit(0, 2)
+
     def thread_status(self, msg):
         self.status_signal.emit(msg)
 
@@ -333,7 +411,7 @@ class ProcessImage(QtCore.QRunnable):
 
     def run(self):
         # Hopefully avoid race conditions while accessing files
-        sleep(1)
+        sleep(3)
 
         start_time = time()
         img_name = self.img_file.name
