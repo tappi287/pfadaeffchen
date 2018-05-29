@@ -104,23 +104,20 @@ class ImageFileWatcher(QtCore.QThread):
                                 .format(thread_count, self.thread_pool.activeThreadCount()))
 
         # Propertys
-        self.__img_files = dict()
+        self.__watcher_img_dict = dict()
         self.__img_count = 0
 
     @property
     def watcher_img_dict(self):
-        return self.__img_files
+        return self.__watcher_img_dict
 
     @watcher_img_dict.setter
     def watcher_img_dict(self, val):
-        self.__img_files.update(val)
+        self.__watcher_img_dict.update(val)
 
     @watcher_img_dict.deleter
     def watcher_img_dict(self):
-        self.__img_files = dict()
-
-        # Reset image count
-        del self.img_count
+        self.__watcher_img_dict = dict()
 
     @property
     def img_count(self):
@@ -136,7 +133,12 @@ class ImageFileWatcher(QtCore.QThread):
 
     def reset(self):
         self.create_psd_requested = False
+
+        # Resets directory file index
         del self.watcher_img_dict
+
+        # Reset image count
+        del self.img_count
 
     def deactivate_watch(self):
         self.watch_active = False
