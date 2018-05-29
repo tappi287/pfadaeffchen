@@ -33,11 +33,14 @@ class Job(object):
     combo_box_items = [_('Zum Anfang der Warteschlange'), _('Ans Ende der Warteschlange'), _('Abbrechen')]
     button_txt = _('Ausführen')
 
-    def __init__(self, job_title, scene_file, render_dir, renderer, client='Server',):
+    def __init__(self, job_title, scene_file, render_dir, renderer, ignore_hidden_objects='1', client='Server'):
         self.title = job_title
         self.file = scene_file
         self.render_dir = render_dir
         self.renderer = renderer
+
+        # CSB Import option ignoreHiddenObject
+        self.ignore_hidden_objects = ignore_hidden_objects
 
         # Class version
         self.version = 1

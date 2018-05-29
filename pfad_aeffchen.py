@@ -49,6 +49,8 @@ de = get_translation()
 de.install()
 _ = de.gettext
 
+# TODO Add proper logging to this mess
+# also see multiprocessing.logging
 setup_log_file(PFAD_AEFFCHEN_LOG_NAME)
 LOGGER = setup_logging('aeffchen_logger')
 
@@ -137,10 +139,12 @@ class PfadAeffchenApp(QtWidgets.QApplication):
         self.ui.startBtn.pressed.connect(self.add_job_btn)
         self.ui.renderPathBtn.pressed.connect(self.open_dir_dialog)
         self.ui.sceneFileBtn.pressed.connect(self.open_file_dialog)
+        self.ui.checkBoxCsbIgnoreHidden.toggled.connect(self.set_csb_import_hidden)
 
         # Local job GUI propertys
         self.scene_file = None
         self.render_path = None
+        self.csb_ignore_hidden = '1'
         self.scene_file_changed.connect(self.set_scene_file)
         self.render_path_changed.connect(self.set_render_path)
 
@@ -159,6 +163,15 @@ class PfadAeffchenApp(QtWidgets.QApplication):
     def reset_app(self):
         self.ui.statusBrowser.clear()
         self.control_app.__init__(self, self.ui, LOGGER)
+
+    def set_csb_import_hidden(self, ignore_hidden):
+        """ Set CSB Import option ignoreHiddenObject """
+        if ignore_hidden:
+            self.csb_ignore_hidden = '1'
+        else:
+            self.csb_ignore_hidden = '0'
+
+        LOGGER.info('Local Job Option CSB Import option: ignoreHiddenObject=%s', self.csb_ignore_hidden)
 
     def set_scene_file(self, file_path):
         """ Set scene file in GUI for local job """
@@ -187,7 +200,7 @@ class PfadAeffchenApp(QtWidgets.QApplication):
 
         job_title = _('Lokaler Job')
         renderer = self.ui.comboBox_renderer.currentText()
-        job_data = (job_title, self.scene_file, self.render_path, renderer)
+        job_data = (job_title, self.scene_file, self.render_path, renderer, self.csb_ignore_hidden)
 
         self.control_app.add_job_signal.emit(job_data)
 

@@ -230,7 +230,11 @@ class ServiceManager(QThread):
 
     def add_job(self, job_data, client: str=None):
         if type(job_data) is str:
-            job_data = tuple(job_data.split(';', 3))
+            # Remove trailing semicolon
+            if job_data.endswith(';'):
+                job_data = job_data[:-1]
+            # Convert to tuple
+            job_data = tuple(job_data.split(';'))
 
         if not len(job_data) > 2:
             return False
@@ -404,8 +408,6 @@ class ServiceManager(QThread):
         elif msg.startswith('ADD_JOB'):
             job_string_data = msg[len('ADD_JOB '):]
             result = self.add_job(job_string_data, client_name)
-
-            # self.wait(msecs=150)
 
             if result:
                 response = _('Job #{0:02d} eingereiht in laufende Jobs.').format(len(self.job_working_queue))

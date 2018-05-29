@@ -47,6 +47,7 @@ parser.add_argument('render_path', help='Absolute path to the render output dire
 parser.add_argument('env', help='Space separated, quoted Paths to extend the mayapy pythonpaths.', type=str)
 parser.add_argument('version', help='String value 2016.5 or 2017', type=str)
 parser.add_argument('renderer', help='String value eg. mayaHardware2', type=str)
+parser.add_argument('csb_ignore_hidden', help='Boolean as integer 1 or 0', type=int)
 
 # Parse command line arguments
 args = parser.parse_args()
@@ -102,7 +103,7 @@ def main():
     if scene_ext.capitalize() == '.csb':
         # Import CSB File
         send_message('Importiere CSB Szenendatei:<br><i>' + scene_name + '</i>')
-        mfu.import_csb(args.file_path)
+        mfu.import_csb(args.file_path, args.csb_ignore_hidden)
     elif scene_ext.capitalize() == '.mb':
         # Load maya binary
         send_message('Oeffne Maya Binaere Szenendatei:<br><i>' + scene_name + '</i>')

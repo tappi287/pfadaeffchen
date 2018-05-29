@@ -53,7 +53,7 @@
         </font>
        </property>
        <property name="currentIndex">
-        <number>0</number>
+        <number>1</number>
        </property>
        <property name="tabSpacing">
         <number>2</number>
@@ -109,7 +109,7 @@
         <property name="geometry">
          <rect>
           <x>0</x>
-          <y>0</y>
+          <y>-78</y>
           <width>1003</width>
           <height>224</height>
          </rect>
@@ -221,7 +221,7 @@
              </property>
             </widget>
            </item>
-           <item alignment="Qt::AlignRight|Qt::AlignTop">
+           <item alignment="Qt::AlignLeft|Qt::AlignTop">
             <widget class="QComboBox" name="comboBox_renderer">
              <property name="font">
               <font>
@@ -231,6 +231,35 @@
               </font>
              </property>
             </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="checkBoxCsbIgnoreHidden">
+             <property name="font">
+              <font>
+               <weight>50</weight>
+               <bold>false</bold>
+              </font>
+             </property>
+             <property name="text">
+              <string>CSB Importer ignoreHiddenObject</string>
+             </property>
+             <property name="checked">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="horizontalSpacer_2">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
            </item>
           </layout>
          </item>

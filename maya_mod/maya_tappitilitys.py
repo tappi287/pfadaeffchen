@@ -541,9 +541,20 @@ class MayaUtils(object):
 
 class MayaFileUtils(object):
     @staticmethod
-    def import_csb(file_path):
+    def import_csb(file_path, ignore_hidden_objects=1):
         file_type = mt_settings['csb_import']['typ']
         options = mt_settings['csb_import']['options']
+
+        # Set ignoreHiddenObject option
+        search = 'ignoreHiddenObject='
+        if search in options:
+            s = options.find(search)
+            e = s + len(search) + 1
+            option_str = options[s:e]
+            new_option_str = option_str[:-1] + str(ignore_hidden_objects)
+
+            # Set option by replacing the option string
+            options = options.replace(option_str, new_option_str)
 
         cmds.file(file_path, i=True, typ=file_type, options=options)
 

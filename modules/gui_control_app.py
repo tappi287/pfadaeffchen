@@ -417,12 +417,13 @@ class ControlApp(QtCore.QObject, LedControl):
     def start_render_process(self):
         """ Start the layer creation process """
         args = (LOGGER,                         # Provide with the local logger
-                self.current_job.file,          # Scene file
-                self.current_job.render_dir,    # Render path
+                self.current_job.file,          # Arg Scene file
+                self.current_job.render_dir,    # Arg Render path
+                self.mod_dir,                   # Arg Env / module directory
+                self.current_job.ignore_hidden_objects,   # Arg CSB Import option ignoreHiddenObject
+                self.ui.comboBox_version.currentText(),   # Arg Maya Version
+                self.ui.comboBox_renderer.currentText(),  # Arg Maya renderer
                 self.watcher_create_psd,        # Successfully finished Callback
-                self.mod_dir,                   # module directory
-                self.ui.comboBox_version.currentText(),
-                self.ui.comboBox_renderer.currentText(),
                 self.job_failed,                # Un-successfully finished Callback
                 self.job_status,                # Update job status
                 )
