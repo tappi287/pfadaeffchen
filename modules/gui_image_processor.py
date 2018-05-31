@@ -24,6 +24,7 @@ from pathlib import Path
 from PyQt5 import QtCore
 
 from modules.detect_lang import get_translation
+from modules.setup_log import setup_queued_logger
 from modules.app_globals import *
 from maya_mod.start_mayapy import run_module_in_standalone
 
@@ -53,6 +54,7 @@ class ImageFileWatcher(QtCore.QThread):
     file_removed_signal = QtCore.pyqtSignal(set)
     status_signal = QtCore.pyqtSignal(str)
     psd_created_signal = QtCore.pyqtSignal()
+    img_job_failed_signal = QtCore.pyqtSignal()
 
     led_signal = QtCore.pyqtSignal(int, int)
 
@@ -67,9 +69,9 @@ class ImageFileWatcher(QtCore.QThread):
     # Scene file name
     scene_file_name = _('KeineSzenenDatei')
 
-    def __init__(self, parent, output_dir, scene_file, mod_dir, logger):
+    def __init__(self, parent, output_dir, scene_file, mod_dir, logging_queue):
         global LOGGER
-        LOGGER = logger
+        LOGGER = setup_queued_logger(__name__, logging_queue)
         super(ImageFileWatcher, self).__init__(parent=parent)
 
         self.watch_active = False
@@ -95,6 +97,7 @@ class ImageFileWatcher(QtCore.QThread):
         self.file_created_signal.connect(self.parent.file_created)
         self.file_removed_signal.connect(self.parent.file_removed)
         self.psd_created_signal.connect(self.parent.psd_created)
+        self.img_job_failed_signal.connect(self.parent.img_job_failed)
         self.led_signal.connect(self.parent.led)
 
         # Init message
@@ -206,11 +209,15 @@ class ImageFileWatcher(QtCore.QThread):
             # Threads detecting empty images are running, abort
             return
 
-        img_dict = self.watcher_img_dict
         create_psd = False
-        # TODO Detect zero images
+        if not len(self.watcher_img_dict):
+            # No images to create PSD from, set Job as failed
+            self.img_job_failed_signal.emit()
+            self.reset()
+            self.deactivate_watch()
+            return
 
-        for __i in img_dict.items():
+        for __i in self.watcher_img_dict.items():
             img_key, img_file_dict = __i
 
             if not img_file_dict.get('processed'):

@@ -29,6 +29,7 @@ from PyQt5 import QtCore
 
 from maya_mod.start_command_line_render import run_command_line_render
 from maya_mod.start_mayapy import run_module_in_standalone
+from modules.setup_log import setup_queued_logger
 
 
 def log_subprocess_output(pipe):
@@ -50,14 +51,14 @@ class RunLayerCreationSignals(QtCore.QObject):
 class RunLayerCreationProcess(threading.Thread):
     def __init__(self,
                  # Logging instance
-                 logger,
+                 logging_queue,
                  # Process Arguments
                  scene_file, render_path, module_dir=None, ignore_hidden='1', version=None, use_renderer='',
                  # Callbacks
                  callback=None, failed_callback=None, status_callback=None):
         super(RunLayerCreationProcess, self).__init__()
         global LOGGER
-        LOGGER = logger
+        LOGGER = setup_queued_logger(__name__, logging_queue)
 
         self.scene_file, self.render_path = scene_file, render_path
         self.module_dir, self.version = module_dir, version

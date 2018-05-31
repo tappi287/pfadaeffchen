@@ -32,7 +32,7 @@ from PyQt5 import QtWidgets, QtCore
 from PyQt5.uic import loadUi
 
 from modules.detect_lang import get_ms_windows_language, get_translation
-from modules.setup_log import setup_logging, setup_log_file
+from modules.setup_log import setup_logging, setup_queued_logger
 from modules.socket_server import run_watcher_server
 from maya_mod.socket_client import send_message
 from modules.gui_image_processor import ImageFileWatcher
@@ -83,12 +83,13 @@ class WatcherApp(QtWidgets.QApplication):
     deactivate_watch = QtCore.pyqtSignal()
 
     """ Main GUI Application """
-    def __init__(self, mod_dir, render_path, scene_file, version):
+    def __init__(self, mod_dir, render_path, scene_file, version, logging_queue):
         super(WatcherApp, self).__init__(sys.argv)
 
         self.app_ui = WatcherWindow(self, mod_dir)
         self.app_closing = False
         self.mod_dir, self.watch_dir, self.scene_file, self.version = mod_dir, render_path, scene_file, version
+        self.logging_queue = logging_queue
 
         self.server = run_watcher_server(self.signal_receiver)
 
@@ -124,7 +125,14 @@ class WatcherApp(QtWidgets.QApplication):
         send_message(msg)
         self.signal_receiver(msg)
 
-    def psd_created(self):
+    @staticmethod
+    def img_job_failed():
+        """ Called if zero images detected for psd creation """
+        send_message(_('Keine Bilddaten gefunden fuer PSD Erstellung.'))
+        send_message('COMMAND IMG_JOB_FAILED')
+
+    @staticmethod
+    def psd_created():
         send_message(_('PSD Erstellung abgeschlossen.'))
         send_message('COMMAND IMG_JOB_FINISHED')
 
@@ -143,7 +151,7 @@ class WatcherApp(QtWidgets.QApplication):
         self.app_ui.close()
 
     def start_image_watcher(self):
-        self.image_watcher = ImageFileWatcher(self, self.watch_dir, self.scene_file, self.mod_dir, LOGGER)
+        self.image_watcher = ImageFileWatcher(self, self.watch_dir, self.scene_file, self.mod_dir, self.logging_queue)
 
         # Connect signals to thread
         self.request_psd.connect(self.image_watcher.create_psd_request)
@@ -199,12 +207,11 @@ class WatcherApp(QtWidgets.QApplication):
             self.watcher_dir_changed.emit(self.watch_dir)
 
 
-def start_watcher(mod_dir, render_path, scene_file, version):
-    setup_log_file(WATCHER_PROCESS_LOG_NAME)
+def start_watcher(mod_dir, render_path, scene_file, version, logging_queue):
     global LOGGER
-    LOGGER = setup_logging('watcher_logger')
+    LOGGER = setup_queued_logger(__name__, logging_queue)
 
-    app = WatcherApp(mod_dir, render_path, scene_file, version)
+    app = WatcherApp(mod_dir, render_path, scene_file, version, logging_queue)
     app.exec_()
 
     sys.exit()
