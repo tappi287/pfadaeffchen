@@ -176,6 +176,7 @@ class ControlApp(QtCore.QObject, LedControl):
     current_job_canceled_signal = QtCore.pyqtSignal()
     current_job_finished_signal = QtCore.pyqtSignal()
     current_job_status_signal = QtCore.pyqtSignal(int)
+    current_job_status_name_signal = QtCore.pyqtSignal(str)
     current_job_img_num_signal = QtCore.pyqtSignal(int, int)
 
     # Job finished timeout
@@ -482,6 +483,7 @@ class ControlApp(QtCore.QObject, LedControl):
         self.current_job_canceled_signal.connect(self.manager.set_job_canceled)
         self.current_job_finished_signal.connect(self.manager.set_job_finished)
         self.current_job_status_signal.connect(self.manager.set_job_status)
+        self.current_job_status_name_signal.connect(self.manager.set_job_status_name)
         self.current_job_img_num_signal.connect(self.manager.set_job_img_num)
 
         self.manager.start()
@@ -514,6 +516,12 @@ class ControlApp(QtCore.QObject, LedControl):
                 img_num = int(socket_command[len('IMG_NUM '):])
                 self.current_job_img_num_signal.emit(img_num, 0)
                 self.current_job.img_num = img_num
+                self.update_progress()
+            elif socket_command.startswith('STATUS_NAME'):
+                # Update status description with custom status
+                status_name = socket_command[len('STATUS_NAME '):]
+                self.current_job_status_name_signal.emit(status_name)
+                self.current_job.status_name = status_name
                 self.update_progress()
 
             elif socket_command == 'CREATE_PSD':

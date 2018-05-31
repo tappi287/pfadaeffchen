@@ -27,9 +27,9 @@ _ = de.gettext
 
 class Job(object):
     """ Holds information about a render job """
-    status_description = [_('Warteschlange'), _('Szene wird vorbereitet'),
-                          _('Rendering'), _('Bilderkennung'),
-                          _('Abgeschlossen'), _('Fehlgeschlagen'), _('Abgebrochen')]
+    status_desc_list = [_('Warteschlange'), _('Szene wird vorbereitet'),
+                        _('Rendering'), _('Bilderkennung'),
+                        _('Abgeschlossen'), _('Fehlgeschlagen'), _('Abgebrochen')]
     combo_box_items = [_('Zum Anfang der Warteschlange'), _('Ans Ende der Warteschlange'), _('Abbrechen')]
     button_txt = _('Ausführen')
 
@@ -60,7 +60,7 @@ class Job(object):
 
         # Status 0 - queue, 1 - scene editing, 2 - rendering, 3 - Image detection, 4 - finished, 5 - failed
         self.__status = 0
-        self.status_name = self.status_description[self.__status]
+        self.status_name = self.status_desc_list[self.__status]
         self.in_progress = False
 
     @property
@@ -94,10 +94,10 @@ class Job(object):
 
         self.__status = status
 
-        if status > len(self.status_description):
+        if status > len(self.status_desc_list):
             status_desc = _('Unbekannt')
         else:
-            status_desc = self.status_description[status]
+            status_desc = self.status_desc_list[status]
 
         self.status_name = status_desc
 

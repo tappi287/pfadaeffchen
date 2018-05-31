@@ -103,14 +103,17 @@ def main():
     if scene_ext.capitalize() == '.csb':
         # Import CSB File
         send_message('Importiere CSB Szenendatei:<br><i>' + scene_name + '</i>')
+        send_message('COMMAND STATUS_NAME Importiere CSB Datei')
         mfu.import_csb(args.file_path, args.csb_ignore_hidden)
     elif scene_ext.capitalize() == '.mb':
         # Load maya binary
         send_message('Oeffne Maya Binaere Szenendatei:<br><i>' + scene_name + '</i>')
+        send_message('COMMAND STATUS_NAME Importiere Maya Binary')
         mfu.open_file(args.file_path)
 
     # Setup scene with foreground matte layers per material
     send_message('Erstelle render layer setup.')
+    send_message('COMMAND STATUS_NAME Erstelle Render-Layer Setup')
     num_layers = maya_matte_layers.create()
     send_message('{:04d} Layer erstellt.'.format(num_layers))
     send_message('COMMAND LAYER_NUM {:04d}'.format(num_layers))
@@ -126,6 +129,7 @@ def main():
     # Close the scene
     mfu.new_file()
     send_message('Szene entladen. Ressourcen freigegeben.')
+    send_message('COMMAND STATUS_NAME Rendering Szene erstellt')
 
 
 if __name__ == '__main__':

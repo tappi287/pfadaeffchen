@@ -321,6 +321,10 @@ class ServiceManager(QThread):
         self.current_job.status = status
         self.invalidate_transfer_cache()
 
+    def set_job_status_name(self, status_name):
+        self.current_job.status_name = status_name
+        self.invalidate_transfer_cache()
+
     def set_job_img_num(self, img_num: int=0, total_img_num: int=0):
         if total_img_num:
             self.current_job.total_img_num = total_img_num
