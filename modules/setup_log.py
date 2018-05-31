@@ -21,6 +21,11 @@
 """
 import os
 import logging
+try:
+    # Available from Python >3.2
+    from logging.handlers import QueueHandler, QueueListener
+except ImportError:
+    pass
 import logging.config
 from datetime import datetime
 from modules.app_globals import PFAD_AEFFCHEN_LOG_NAME
@@ -55,9 +60,9 @@ def setup_log_file(log_file_name=PFAD_AEFFCHEN_LOG_NAME):
             },
         'loggers': {
             'aeffchen_logger': {
-                'handlers': ['file', 'console'], 'propagate': True, 'level': 'DEBUG', },
+                'handlers': ['file', 'console'], 'propagate': False, 'level': 'DEBUG', },
             'watcher_logger': {
-                'handlers': ['file', 'console'], 'propagate': True, 'level': 'DEBUG', }
+                'handlers': ['file', 'console'], 'propagate': False, 'level': 'DEBUG', }
             }
         }
 
@@ -136,13 +141,29 @@ class JobLogFile(object):
         cls.current_path = None
 
 
-def setup_logging(name=''):
-    """
-    logging.basicConfig(
-        filename='my_matte_layer_creation.log', level=logging.DEBUG, format='%(processName)s %(message)s'
-        )
-    """
+def setup_log_queue_listener(logger, queue):
+    handler_ls = list()
+    for handler in logger.handlers:
+        logger.info('Removing handler that will be added to listener: %s', handler)
+        logger.removeHandler(handler)
+        handler_ls.append(handler)
 
+    handler_ls = tuple(handler_ls)
+    queue_handler = QueueHandler(queue)
+    logger.addHandler(queue_handler)
+
+    listener = QueueListener(queue, *handler_ls)
+    return listener
+
+
+def setup_queued_logger(name, queue):
+    queue_handler = QueueHandler(queue)
+    logger = logging.getLogger(name)
+    logger.addHandler(queue_handler)
+    return logger
+
+
+def setup_logging(name=''):
     if name in ['aeffchen_logger', 'watcher_logger']:
         current_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         logger = logging.getLogger(name)

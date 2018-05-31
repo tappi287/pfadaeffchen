@@ -31,13 +31,13 @@ import sys
 import os
 import logging
 import qt_ledwidget
-from gettext import gettext, translation
+from multiprocessing import Queue
 from PyQt5 import QtWidgets, QtCore
 from PyQt5.uic import loadUi
 
 from modules.detect_lang import get_ms_windows_language, get_translation
 from modules.gui_control_app import ControlApp
-from modules.setup_log import setup_logging, setup_log_file
+from modules.setup_log import setup_logging, setup_log_file, setup_log_queue_listener
 from modules.setup_paths import get_current_modules_dir
 from modules.app_globals import *
 
@@ -49,8 +49,7 @@ de = get_translation()
 de.install()
 _ = de.gettext
 
-# TODO Add proper logging to this mess
-# also see multiprocessing.logging
+# Setup Logger
 setup_log_file(PFAD_AEFFCHEN_LOG_NAME)
 LOGGER = setup_logging('aeffchen_logger')
 
@@ -129,9 +128,9 @@ class PfadAeffchenApp(QtWidgets.QApplication):
     start_btn_timeout.setInterval(800)
 
     """ Main GUI Application """
-    def __init__(self, mod_dir, version):
+    def __init__(self, mod_dir, version, logging_queue):
         super(PfadAeffchenApp, self).__init__(sys.argv)
-        self.mod_dir = mod_dir
+        self.mod_dir, self.logging_queue = mod_dir, logging_queue
 
         # Create Main Window
         self.ui = MainWindow(self, mod_dir, version)
@@ -155,14 +154,14 @@ class PfadAeffchenApp(QtWidgets.QApplication):
         self.aboutToQuit.connect(self.about_to_quit)
 
         # Run app controls in it's own class for easy resetting functionality
-        self.control_app = ControlApp(self, self.ui, LOGGER)
+        self.control_app = ControlApp(self, self.ui, logging_queue)
 
         # Show Main Window
         self.ui.show()
 
     def reset_app(self):
         self.ui.statusBrowser.clear()
-        self.control_app.__init__(self, self.ui, LOGGER)
+        self.control_app.__init__(self, self.ui, self.logging_queue)
 
     def set_csb_import_hidden(self, ignore_hidden):
         """ Set CSB Import option ignoreHiddenObject """
@@ -295,6 +294,14 @@ def read_version(mod_dir):
 
 
 def main():
+    # Prepare a multiprocess logging queue
+    logging_queue = Queue(-1)
+
+    # This will move all handlers from LOGGER to the queue listener
+    log_listener = setup_log_queue_listener(LOGGER, logging_queue)
+    # Start log queue listener in it's own thread
+    log_listener.start()
+
     mod_dir = get_current_modules_dir()
     LOGGER.info('Modules directory: %s', mod_dir)
 
@@ -305,11 +312,12 @@ def main():
     version = read_version(mod_dir)
     LOGGER.debug('Running version: %s', version)
 
-    app = PfadAeffchenApp(mod_dir, version)
+    app = PfadAeffchenApp(mod_dir, version, logging_queue)
     result = app.exec_()
     LOGGER.debug('---------------------------------------')
     LOGGER.debug('Qt application finished with exitcode %s', result)
 
+    log_listener.stop()
     logging.shutdown()
     sys.exit()
 

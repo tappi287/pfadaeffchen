@@ -37,7 +37,7 @@ from modules.gui_image_watcher_process import start_watcher
 from modules.gui_service_manager import ServiceManager
 from modules.gui_create_process import RunLayerCreationProcess
 from modules.job import Job
-from modules.setup_log import JobLogFile
+from modules.setup_log import JobLogFile, setup_queued_logger
 from modules.setup_paths import get_user_directory, get_maya_version
 from modules.socket_broadcaster import ServiceAnnouncer
 from modules.socket_client_3 import SendMessage
@@ -198,11 +198,11 @@ class ControlApp(QtCore.QObject, LedControl):
     # Service announcer
     announcer = None
 
-    def __init__(self, app, ui, logger):
+    def __init__(self, app, ui, logging_queue):
         super(ControlApp, self).__init__(ui=ui)
         global LOGGER
-        LOGGER = logger
-        self.app, self.ui = app, ui
+        LOGGER = setup_queued_logger(__name__, logging_queue)
+        self.app, self.ui, self.logging_queue = app, ui, logging_queue
 
         self.scene_file = None
         self.render_path = None
@@ -296,6 +296,7 @@ class ControlApp(QtCore.QObject, LedControl):
                                                            render_path,
                                                            scene_file,
                                                            self.ui.comboBox_version.currentText(),
+                                                           self.logging_queue,
                                                            )
                                )
         self.watcher.start()
@@ -416,7 +417,7 @@ class ControlApp(QtCore.QObject, LedControl):
 
     def start_render_process(self):
         """ Start the layer creation process """
-        args = (LOGGER,                         # Provide with the local logger
+        args = (self.logging_queue,             # Provide with the logging queue
                 self.current_job.file,          # Arg Scene file
                 self.current_job.render_dir,    # Arg Render path
                 self.mod_dir,                   # Arg Env / module directory
@@ -470,7 +471,7 @@ class ControlApp(QtCore.QObject, LedControl):
         """
         LOGGER.info('Starting Service manager.')
         # Setup service manager
-        self.manager = ServiceManager(self, self.app, self.ui, LOGGER)
+        self.manager = ServiceManager(self, self.app, self.ui, self.logging_queue)
         self.queue_next_job_signal.connect(self.manager.job_finished)
 
         self.add_job_signal.connect(self.manager.add_job)

@@ -33,6 +33,7 @@ from PyQt5.QtCore import QThread, pyqtSignal, QTimer
 from PyQt5.QtCore import Qt
 
 from modules.job import Job
+from modules.setup_log import setup_queued_logger
 from modules.detect_lang import get_translation
 from modules.setup_paths import get_user_directory, create_unique_render_path
 from modules.app_globals import SocketAddress, JOB_DATA_EOS
@@ -83,10 +84,10 @@ class ServiceManager(QThread):
     pickle_cache = b''
     transfer_cache = b''
 
-    def __init__(self, control_app, app, ui, logger):
+    def __init__(self, control_app, app, ui, logging_queue):
         super(ServiceManager, self).__init__()
         global LOGGER
-        LOGGER = logger
+        LOGGER = setup_queued_logger(__name__, logging_queue)
 
         self.control_app, self.app, self.ui = control_app, app, ui
 
