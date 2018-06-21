@@ -16,7 +16,7 @@ Creates a matte for every material in your Maya scene and outputs a layered PSD 
  2. Run the application
  3. Add a local job via the local job tab
 
-### Create the installer yourself
+### Build the installer yourself
  1. Install [Nullsoft install system](http://nsis.sourceforge.net/Download)
  2. Install [pynsist](https://pynsist.readthedocs.io/en/latest/) `pip install pynsist`
  3. Download / clone the project, go to ``pfad_aeffchen`` folder that contains ``pfad_aeffchen.cfg``
