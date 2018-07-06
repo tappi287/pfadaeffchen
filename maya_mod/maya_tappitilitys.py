@@ -402,14 +402,25 @@ class MayaUtils(object):
 
             if not has_shading:
                 __t = Om.MFnDagNode(__t)
-                print(__t.getPath().fullPathName())
-                meshes_without_shading.append(__t.getPath().fullPathName())
+                try:
+                    path_name = __t.getPath().fullPathName()
+                    print(path_name)
+                    meshes_without_shading.append(__t.getPath().fullPathName())
+                except Exception as e:
+                    LOGGER.error('Getting object DAG path failed. Trying shorter path.\n%s', e)
+                    try:
+                        path_name = __t.getPath()
+                        print(path_name)
+                        meshes_without_shading.append(__t.getPath())
+                    except Exception as e:
+                        LOGGER.error('Getting object DAG path failed. \n%s', e)
 
         # Get name of shading group
         shading_grp_name = shading_engine.name()
 
         # Force assign shadingEngine to objects with maya.cmds
-        cmds.sets(meshes_without_shading, forceElement=shading_grp_name, noWarnings=True)
+        if meshes_without_shading:
+            cmds.sets(meshes_without_shading, forceElement=shading_grp_name, noWarnings=True)
 
     @staticmethod
     def create_material(material_type='lambert', color=(1.0, 1.0, 1.0)):
