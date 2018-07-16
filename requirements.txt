@@ -1,3 +1,4 @@
 PyQt5==5.9.2
 sip==4.19.7
 qt_ledwidget==0.2
+psutil==5.4.6

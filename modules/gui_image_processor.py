@@ -25,6 +25,7 @@ from PyQt5 import QtCore
 
 from modules.detect_lang import get_translation
 from modules.setup_log import setup_queued_logger
+from modules.check_file_access import CheckFileAccess
 from modules.app_globals import *
 from maya_mod.start_mayapy import run_module_in_standalone
 
@@ -47,6 +48,20 @@ def file_is_locked(file_path):
             file_object.close()
 
     return file_lock
+
+
+def check_file_in_use(img_file: Path):
+    """ Check if file is accessed by another process """
+    try:
+        file_access = CheckFileAccess(img_file)
+
+        if file_access.check():
+            LOGGER.debug('File in use by another process: %s - %s', file_access.process_id, file_access.process_name)
+            return True
+    except Exception as e:
+        LOGGER.error('Error checking file usage. %s', e)
+
+    return False
 
 
 class ImageFileWatcher(QtCore.QThread):
@@ -281,8 +296,11 @@ class ImageFileWatcher(QtCore.QThread):
             return img_dict
 
         for __img_file in self.output_dir.glob('*' + ImgParams.extension):
+            # --------------------------------------------
+            # Check file size
             try:
-                if __img_file.stat().st_size < 200:
+                file_size = __img_file.stat().st_size
+                if file_size < 350000:
                     # Skip small files that are have just been written by the renderer
                     # 4K empty iff image file should be at least 539 kB
                     continue
@@ -291,6 +309,15 @@ class ImageFileWatcher(QtCore.QThread):
                 # File probably deleted while watching, skip
                 continue
 
+            # --------------------------------------------
+            # Check for growing files
+            self.sleep(0.5)
+            new_file_size = __img_file.stat().st_size
+
+            if new_file_size != file_size:
+                continue
+
+            # --------------------------------------------
             # Image key
             img_key = __img_file.stem
 
@@ -425,11 +452,11 @@ class ProcessImage(QtCore.QRunnable):
         start_time = time()
         img_name = self.img_file.name
 
-        while file_is_locked(self.img_file.as_posix()):
+        while check_file_in_use(self.img_file):
             if start_time - time() > self.file_lock_timeout:
                 break
 
-            print('File is locked ' + self.img_file.as_posix())
+            print('File in use ' + self.img_file.as_posix())
             self.signals.status.emit(_('Kein Schreibzugriff auf {}').format(img_name))
             sleep(2)
 
