@@ -344,12 +344,16 @@ class ImageFileWatcher(QtCore.QThread):
 
         if not new_file_set:
             if not self.create_psd_requested:
+                # No new files, rendering not finished
                 return
+
+            if self.previous_imgs:
+                # Rendering finished, process previous files
+                new_file_set = self.previous_imgs
+                del self.previous_imgs
             else:
-                if self.previous_imgs:
-                    new_file_set = self.previous_imgs
-                else:
-                    return
+                # Rendering finished but no previous unprocessed files
+                return
         else:
             # Add new files to created image count
             self.img_count = len(new_file_set)
@@ -360,13 +364,11 @@ class ImageFileWatcher(QtCore.QThread):
             self.file_created_signal.emit(new_file_set, self.img_count)
 
         if self.create_psd_requested:
-            # PSD requested, save to access all files as
-            # the rendering thread is finished.
+            # PSD requested, save to access all files because the rendering thread is finished.
             # Start image detection process for last added file-s
             self.add_new_file_set_as_threads(img_dict, new_file_set)
         else:
-            # Unsave to access last created file
-            # as rendering thread is active.
+            # Not save to access last created file-s as rendering thread is active.
             # Process the previous created image-s
             self.add_new_file_set_as_threads(img_dict, self.previous_imgs)
             self.previous_imgs = new_file_set

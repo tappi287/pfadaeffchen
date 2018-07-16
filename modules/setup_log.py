@@ -88,11 +88,12 @@ class JobLogFile(object):
         cls._reset()
 
         cls.logger = logging.getLogger('JobLogger')
+        cls.logger.setLevel(logging.INFO)
 
         filename = datetime.now().strftime('Job_%Y-%m-%d_%H-%M-%S.log')
         cls.current_path = os.path.join(cls.usr_profile, filename)
 
-        formatter = logging.Formatter(fmt='%(module)s: %(message)s')
+        formatter = logging.Formatter(fmt='%(asctime)s %(module)s: %(message)s')
 
         cls.fh = logging.FileHandler(cls.current_path)
         cls.fh.setFormatter(formatter)
