@@ -124,6 +124,7 @@ class ImageFileWatcher(QtCore.QThread):
         # Propertys
         self.__watcher_img_dict = dict()
         self.__img_count = 0
+        self.__previous_imgs = set()
 
     @property
     def watcher_img_dict(self):
@@ -149,6 +150,18 @@ class ImageFileWatcher(QtCore.QThread):
     def img_count(self):
         self.__img_count = 0
 
+    @property
+    def previous_imgs(self):
+        return self.__previous_imgs
+
+    @previous_imgs.setter
+    def previous_imgs(self, val: set):
+        self.__previous_imgs = val
+
+    @previous_imgs.deleter
+    def previous_imgs(self):
+        self.__previous_imgs = set()
+
     def reset(self):
         self.create_psd_requested = False
 
@@ -157,6 +170,9 @@ class ImageFileWatcher(QtCore.QThread):
 
         # Reset image count
         del self.img_count
+
+        # Reset previous image
+        del self.previous_imgs
 
     def deactivate_watch(self):
         self.watch_active = False
@@ -195,6 +211,9 @@ class ImageFileWatcher(QtCore.QThread):
         self.watcher_img_dict = img_dict
 
     def initial_directory_index(self):
+        # Resets property
+        self.reset()
+
         # Index existing files on initial watch
         self.watcher_img_dict = self.index_img_files(set_processed=True)
 
@@ -273,9 +292,6 @@ class ImageFileWatcher(QtCore.QThread):
         # Disable file watch until initial directory index
         self.watch_active = False
 
-        # Reset process property
-        del self.watcher_img_dict
-
         self.output_dir = Path(directory)
 
         if not self.output_dir.exists():
@@ -309,15 +325,6 @@ class ImageFileWatcher(QtCore.QThread):
                 # File probably deleted while watching, skip
                 continue
 
-            # --------------------------------------------
-            # Check for growing files
-            self.sleep(0.5)
-            new_file_size = __img_file.stat().st_size
-
-            if new_file_size != file_size:
-                continue
-
-            # --------------------------------------------
             # Image key
             img_key = __img_file.stem
 
@@ -336,17 +343,36 @@ class ImageFileWatcher(QtCore.QThread):
         new_file_set = self.get_file_difference(old_dict=self.watcher_img_dict, new_dict=img_dict)
 
         if not new_file_set:
-            return
+            if not self.create_psd_requested:
+                return
+            else:
+                if self.previous_imgs:
+                    new_file_set = self.previous_imgs
+                else:
+                    return
+        else:
+            # Add new files to created image count
+            self.img_count = len(new_file_set)
 
-        LOGGER.debug('Watcher found new files: %s', new_file_set)
+            LOGGER.debug('Watcher found new files: %s', new_file_set)
 
-        # Add new files to created image count
-        self.img_count = len(new_file_set)
+            # Inform the parent thread
+            self.file_created_signal.emit(new_file_set, self.img_count)
 
-        # Inform the parent thread
-        self.file_created_signal.emit(new_file_set, self.img_count)
+        if self.create_psd_requested:
+            # PSD requested, save to access all files as
+            # the rendering thread is finished.
+            # Start image detection process for last added file-s
+            self.add_new_file_set_as_threads(img_dict, new_file_set)
+        else:
+            # Unsave to access last created file
+            # as rendering thread is active.
+            # Process the previous created image-s
+            self.add_new_file_set_as_threads(img_dict, self.previous_imgs)
+            self.previous_imgs = new_file_set
 
-        # Start image detection process
+    def add_new_file_set_as_threads(self, img_dict, new_file_set):
+        """ check_for_created_files helper """
         for img_key in new_file_set:
             img_file = img_dict.get(img_key).get('path')
 
@@ -451,14 +477,6 @@ class ProcessImage(QtCore.QRunnable):
 
         start_time = time()
         img_name = self.img_file.name
-
-        while check_file_in_use(self.img_file):
-            if start_time - time() > self.file_lock_timeout:
-                break
-
-            print('File in use ' + self.img_file.as_posix())
-            self.signals.status.emit(_('Kein Schreibzugriff auf {}').format(img_name))
-            sleep(2)
 
         # Run process in try-except to avoid re-running this QRunnable on process errors
         try:

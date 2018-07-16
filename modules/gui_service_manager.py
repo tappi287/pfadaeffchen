@@ -470,7 +470,7 @@ class ServiceManager(QThread):
         if tcp_handler:
             self.tcp_respond_signal.connect(tcp_handler.respond)
             if type(response) is str:
-                LOGGER.info('Sending response: %s', response)
+                LOGGER.debug('Sending response: %s', response)
             else:
-                LOGGER.info('Sending response: transfer cache - %s', len(response))
+                LOGGER.debug('Sending response: transfer cache - %s', len(response))
             self.tcp_respond_signal.emit(response)

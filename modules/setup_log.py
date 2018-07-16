@@ -42,7 +42,7 @@ def setup_log_file(log_file_name=PFAD_AEFFCHEN_LOG_NAME):
                 'format': '%(levelname)s %(asctime)s %(module)s %(process)d %(thread)d %(message)s'
                 },
             'simple': {
-                'format': '%(module)s: %(message)s'
+                'format': '%(asctime)s %(module)s: %(message)s'
                 },
             'file_formatter': {
                 'format': '%(asctime)s - %(module)s: %(message)s'
@@ -60,9 +60,9 @@ def setup_log_file(log_file_name=PFAD_AEFFCHEN_LOG_NAME):
             },
         'loggers': {
             'aeffchen_logger': {
-                'handlers': ['file', 'console'], 'propagate': False, 'level': 'DEBUG', },
+                'handlers': ['file', 'console'], 'propagate': False, 'level': 'INFO', },
             'watcher_logger': {
-                'handlers': ['file', 'console'], 'propagate': False, 'level': 'DEBUG', }
+                'handlers': ['file', 'console'], 'propagate': False, 'level': 'INFO', }
             }
         }
 
