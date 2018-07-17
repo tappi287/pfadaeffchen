@@ -348,6 +348,7 @@ class ImageFileWatcher(QtCore.QThread):
             else:
                 if self.previous_imgs:
                     new_file_set = self.previous_imgs
+                    del self.previous_imgs
                 else:
                     return
         else:
