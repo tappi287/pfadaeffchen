@@ -127,6 +127,11 @@ class PfadAeffchenApp(QtWidgets.QApplication):
     start_btn_timeout.setSingleShot(True)
     start_btn_timeout.setInterval(800)
 
+    # Automatic render service start
+    start_render_service_timeout = QtCore.QTimer()
+    start_render_service_timeout.setSingleShot(True)
+    start_render_service_timeout.setInterval(2000)
+
     """ Main GUI Application """
     def __init__(self, mod_dir, version, logging_queue):
         super(PfadAeffchenApp, self).__init__(sys.argv)
@@ -158,6 +163,10 @@ class PfadAeffchenApp(QtWidgets.QApplication):
 
         # Show Main Window
         self.ui.show()
+
+        # Automatically start the render service(for autorun/startup compatibility)
+        self.start_render_service_timeout.timeout.connect(self.ui.startRenderService.toggle)
+        self.start_render_service_timeout.start()
 
     def reset_app(self):
         self.ui.statusBrowser.clear()
