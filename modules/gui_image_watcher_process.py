@@ -193,6 +193,8 @@ class WatcherApp(QtWidgets.QApplication):
                 self.change_watch_scene(socket_command.replace('SCENE_FILE ', ''))
             elif socket_command == 'REQUEST_PSD':
                 self.request_psd.emit()
+            elif socket_command == 'FORCE_REQUEST_PSD':
+                self.request_psd_forced()
 
         current_time = datetime.now().strftime('(%H:%M:%S) ')
         self.app_ui.statusBrowser.append(current_time + msg)

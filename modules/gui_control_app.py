@@ -398,6 +398,17 @@ class ControlApp(QtCore.QObject, LedControl):
 
         self.socket_send.do('COMMAND REQUEST_PSD', SocketAddress.watcher)
 
+    def watcher_force_psd_creation(self):
+        """ Try to force job completion, continue detecting empty rendering results and immediately create PSD """
+
+        if self.watcher:
+            if self.watcher.is_alive():
+                pass
+            else:
+                return
+
+        self.socket_send.do('COMMAND FORCE_REQUEST_PSD', SocketAddress.watcher)
+
     def abort_running_job(self):
         """ Attempt to kill running processes for the current job """
         msg = f'<span style="color:red;"><b>{self.current_job.title} wurde vom Benutzer abgebrochen.</b></span>'

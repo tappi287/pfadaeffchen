@@ -46,6 +46,7 @@ de = get_translation()
 de.install()
 _ = de.gettext
 
+
 def copy_job(job):
     """ Create a flat copy of a job item """
     """
@@ -69,6 +70,7 @@ def copy_job(job):
 class ServiceManager(QThread):
     start_job_signal = pyqtSignal(object)
     abort_running_job_signal = pyqtSignal()
+    force_psd_creation_signal = pyqtSignal()
     job_widget_signal = pyqtSignal(object)
     tcp_respond_signal = pyqtSignal(object)
 
@@ -100,6 +102,7 @@ class ServiceManager(QThread):
         self.start_job_signal.connect(self.control_app.add_render_job)
         self.job_widget_signal.connect(self.control_app.update_job_widget)
         self.abort_running_job_signal.connect(self.control_app.abort_running_job)
+        self.force_psd_creation_signal.connect(self.control_app.watcher_force_psd_creation)
 
         # Run service manager socket server
         self.server = None
@@ -375,7 +378,7 @@ class ServiceManager(QThread):
         self.request_led_signal.emit()
         if client_name:
             if msg != 'GET_JOB_DATA':
-                LOGGER.info('Service Manager received: "%s" from client %s', msg, client_name)
+                LOGGER.debug('Service Manager received: "%s" from client %s', msg, client_name)
         else:
             LOGGER.info('Service manager received: %s', msg)
 
@@ -467,10 +470,22 @@ class ServiceManager(QThread):
             else:
                 response = _('Job mit index {} konnte nicht abgebrochen werden.').format(job_index)
 
+        # ----------- FORCE PSD REQUEST ------------
+        elif msg.startswith('FORCE_PSD_CREATION'):
+            job_index = msg[len('FORCE_PSD_CREATION '):]
+            job = self.get_job_from_index(int(job_index))
+
+            if job:
+                if job is self.current_job:
+                    response = _('PSD Erstellung fuer Job {} wird erzwungen.').format(job.title)
+                    self.force_psd_creation_signal.emit()
+            else:
+                response = _('Kann PSD Erstellung fuer Job {} nicht erzwingen.').format(job.title)
+
         if tcp_handler:
             self.tcp_respond_signal.connect(tcp_handler.respond)
             if type(response) is str:
-                LOGGER.info('Sending response: %s', response)
+                LOGGER.debug('Sending response: %s', response)
             else:
-                LOGGER.info('Sending response: transfer cache - %s', len(response))
+                LOGGER.debug('Sending response: transfer cache - %s', len(response))
             self.tcp_respond_signal.emit(response)
