@@ -62,7 +62,7 @@ if args.env:
 import pymel.core as pm
 import maya_mod.maya_matte_layers as maya_matte_layers
 import maya_mod.maya_render_settings as maya_render_settings
-from maya_mod.maya_tappitilitys import MayaFileUtils as mfu, load_csb_plugin
+from maya_mod.maya_tappitilitys import MayaFileUtils as mfu, load_csb_plugin, MayaUtils as mu
 from modules.setup_log import setup_logging
 from maya_mod.socket_client import send_message
 from modules.app_globals import *
@@ -110,6 +110,12 @@ def main():
         send_message('Oeffne Maya Binaere Szenendatei:<br><i>' + scene_name + '</i>')
         send_message('COMMAND STATUS_NAME Importiere Maya Binary')
         mfu.open_file(args.file_path)
+
+    # Check for DeltaGen camera "Camera"
+    if not mu.get_camera_by_name('Camera'):
+        send_message('Keine renderbare Kamera - "Camera" gefunden! Vorgang abgebrochen.')
+        LOGGER.fatal('Renderable Camera with exact name "Camera" could not be found. Aborting layer creation.')
+        return
 
     # Setup scene with foreground matte layers per material
     send_message('Erstelle render layer setup.')

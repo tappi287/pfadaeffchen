@@ -19,6 +19,7 @@
         You should have received a copy of the GNU General Public License
         along with Pfad Aeffchen.  If not, see <http://www.gnu.org/licenses/>.
 """
+import threading
 from time import sleep, time
 from pathlib import Path
 from PyQt5 import QtCore
@@ -107,6 +108,9 @@ class ImageFileWatcher(QtCore.QThread):
         thread_count = max(1, min(self.max_threads, round(self.idealThreadCount() * 0.3)))
         self.thread_pool.setMaxThreadCount(thread_count)
         self.thread_pool.setExpiryTimeout(self.thread_timeout)
+
+        # Prepare a thread lock
+        self.lock = threading.Lock()
 
         self.status_signal.connect(self.parent.signal_receiver)
         self.file_created_signal.connect(self.parent.file_created)
@@ -208,7 +212,11 @@ class ImageFileWatcher(QtCore.QThread):
     def watch_folder(self):
         img_dict = self.index_img_files(set_processed=False)
         self.report_changes(img_dict)
+
+        # Lock watcher img dict access
+        self.lock.acquire()
         self.watcher_img_dict = img_dict
+        self.lock.release()
 
     def initial_directory_index(self):
         # Resets property
@@ -241,7 +249,7 @@ class ImageFileWatcher(QtCore.QThread):
         """ Check that all images in the directory are processed and create layered PSD file """
         if self.thread_pool.activeThreadCount():
             # Threads detecting empty images are running, abort
-            LOGGER.error('Can not create PSD yet. Image detection threads active. Retrying on next directory index.')
+            LOGGER.debug('Can not create PSD yet. Image detection threads active. Retrying on next directory index.')
             return
 
         create_psd = False
@@ -258,9 +266,12 @@ class ImageFileWatcher(QtCore.QThread):
 
             if not img_file_dict.get('processed'):
                 # Some image(s) are not processed yet, skip
-                LOGGER.error('Can not create PSD yet. Some indexed images are not yet processed.'
+                LOGGER.debug('Can not create PSD yet. Some indexed images are not yet processed.'
                              'Retrying on next directory index.')
-                break
+                if self.force_psd_creation:
+                    continue
+                else:
+                    break
         else:
             # Break never called - everything should be processed
             create_psd = True
@@ -406,13 +417,21 @@ class ImageFileWatcher(QtCore.QThread):
 
         LOGGER.debug('Watcher found removed files: %s', rem_file_set)
 
+        # Lock watcher img dict access
+        self.lock.acquire()
+
         # Reset watcher img dict
         del self.watcher_img_dict
         self.watcher_img_dict = img_dict
 
+        self.lock.release()
+
         self.file_removed_signal.emit(rem_file_set)
 
     def set_image_processed(self, img_file: Path, processed: bool):
+        # Lock watcher img dict access
+        self.lock.acquire()
+
         existing_imgs = self.watcher_img_dict
         img_entry = existing_imgs.get(img_file.stem)
 
@@ -431,18 +450,28 @@ class ImageFileWatcher(QtCore.QThread):
                         # If existing status was already processed, ignore method argument
                         processed = existing_status
 
+        self.lock.release()
+
         return {'processed': processed}
 
     def image_processing_result(self, img_file: Path):
         """ Called from image processing thread """
-        file_dict = self.watcher_img_dict.get(img_file.stem)
+        # Lock watcher img dict access
+        self.lock.acquire()
+
+        img_dict = self.watcher_img_dict
+        file_dict = img_dict.get(img_file.stem)
 
         if file_dict:
             file_dict.update({'processed': True})
         else:
             LOGGER.error('Could not find image %s in ImageWatcher index when trying to set'
                          'image detection thread result! Creating entry for image.', img_file.stem)
-            self.watcher_img_dict[img_file.stem] = dict(path=img_file, processed=True)
+            img_dict[img_file.stem] = dict(path=img_file, processed=True)
+
+        self.watcher_img_dict = img_dict
+
+        self.lock.release()
 
         # Switch Red LED off
         self.led_signal.emit(0, 2)

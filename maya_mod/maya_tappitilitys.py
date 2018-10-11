@@ -481,7 +481,7 @@ class MayaUtils(object):
     def get_camera_by_name(cls, camera_name):
         for c in cls.get_root_transforms(get_cameras=True):
             if c.name() == camera_name:
-                camera_dag_obj = Om.MFnDagNode(c)
+                camera_dag_obj = Om.MFnDagNode(c.child(0))
                 break
         else:
             camera_dag_obj = None
