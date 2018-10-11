@@ -35,6 +35,7 @@ from modules.setup_log import setup_queued_logger
 def log_subprocess_output(pipe):
     """ Redirect subprocess output to logging so it appears in console and log file """
     for line in iter(pipe.readline, b''):
+        #TODO fix logging accssessing log file
         try:
             line = line.decode(encoding='utf-8')
             line = line.replace('\n', '')

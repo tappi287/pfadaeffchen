@@ -435,15 +435,14 @@ class ImageFileWatcher(QtCore.QThread):
 
     def image_processing_result(self, img_file: Path):
         """ Called from image processing thread """
-        existing_imgs = self.watcher_img_dict
-
-        file_dict = existing_imgs.get(img_file.stem)
+        file_dict = self.watcher_img_dict.get(img_file.stem)
 
         if file_dict:
             file_dict.update({'processed': True})
-
-        # Update existing image dict
-        self.watcher_img_dict = existing_imgs
+        else:
+            LOGGER.error('Could not find image %s in ImageWatcher index when trying to set'
+                         'image detection thread result! Creating entry for image.', img_file.stem)
+            self.watcher_img_dict[img_file.stem] = dict(path=img_file, processed=True)
 
         # Switch Red LED off
         self.led_signal.emit(0, 2)
