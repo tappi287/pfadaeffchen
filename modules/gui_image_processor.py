@@ -241,11 +241,13 @@ class ImageFileWatcher(QtCore.QThread):
         """ Check that all images in the directory are processed and create layered PSD file """
         if self.thread_pool.activeThreadCount():
             # Threads detecting empty images are running, abort
+            LOGGER.error('Can not create PSD yet. Image detection threads active. Retrying on next directory index.')
             return
 
         create_psd = False
         if not len(self.watcher_img_dict):
             # No images to create PSD from, set Job as failed
+            LOGGER.error('PSD requested but no images to process. Resetting image watcher.')
             self.img_job_failed_signal.emit()
             self.reset()
             self.deactivate_watch()
@@ -256,6 +258,8 @@ class ImageFileWatcher(QtCore.QThread):
 
             if not img_file_dict.get('processed'):
                 # Some image(s) are not processed yet, skip
+                LOGGER.error('Can not create PSD yet. Some indexed images are not yet processed.'
+                             'Retrying on next directory index.')
                 break
         else:
             # Break never called - everything should be processed
@@ -309,6 +313,7 @@ class ImageFileWatcher(QtCore.QThread):
         img_dict = dict()
 
         if not self.output_dir.exists():
+            LOGGER.error('Can not find image output directory. Nothing to index.')
             return img_dict
 
         for __img_file in self.output_dir.glob('*' + ImgParams.extension):
@@ -462,8 +467,15 @@ class ProcessImageSignals(QtCore.QObject):
 class ProcessImage(QtCore.QRunnable):
     file_lock_timeout = 30.0
 
+    # Image process detection timeout
+    # in case a maya standalone thread get's stuck, we will continue after 10 minutes
+    detection_timeout = QtCore.QTimer()
+    detection_timeout.setTimerType(QtCore.Qt.VeryCoarseTimer)
+    detection_timeout.setInterval(600000)
+
     def __init__(self, img_file, mod_dir, result_callback, status_callback):
         super(ProcessImage, self).__init__()
+        self.process = None
         self.mod_dir = mod_dir
         self.img_file = img_file
         self.img_check_module = Path(self.mod_dir) / 'maya_mod/run_empty_img_check.py'
@@ -473,20 +485,24 @@ class ProcessImage(QtCore.QRunnable):
         self.signals.result.connect(result_callback)
         self.signals.status.connect(status_callback)
 
+        # Prepare timeout
+        self.detection_timeout.timeout.connect(self.kill_process)
+
     def run(self):
         # Hopefully avoid race conditions while accessing files
         sleep(3)
 
-        start_time = time()
         img_name = self.img_file.name
+
+        self.detection_timeout.start()
 
         # Run process in try-except to avoid re-running this QRunnable on process errors
         try:
             # Run Maya standalone to detect and delete empty image file
             LOGGER.debug('Running image detection process for %s', self.img_file.as_posix())
-            process = run_module_in_standalone(
+            self.process = run_module_in_standalone(
                 self.img_check_module.as_posix(), self.img_file.as_posix(), self.mod_dir)
-            process.wait()
+            self.process.wait()
         except Exception as e:
             LOGGER.error(e)
             self.signals.status.emit(_('Fehler im Bilderkennungsprozess:\n{}').format(e))
@@ -499,6 +515,16 @@ class ProcessImage(QtCore.QRunnable):
                 self.signals.status.emit(_('Bilderkennung abgeschlossen für {}. '
                                            '<i>Keine Bildinhalte erkannt.</i>').format(img_name)
                                          )
+
+    def kill_process(self):
+        if self.process:
+            try:
+                LOGGER.info('Attempting to kill Image content detection process.')
+                self.process.kill()
+                LOGGER.info('Image content detection process killed.')
+            except Exception as e:
+                LOGGER.error('Killing the Image content detection process failed!')
+                LOGGER.error(e)
 
 
 class CreatePSDFileSignals(QtCore.QObject):
