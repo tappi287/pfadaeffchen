@@ -60,12 +60,17 @@ def setup_log_file(log_file_name=PFAD_AEFFCHEN_LOG_NAME):
                 'filename': os.path.join(usr_profile, log_file_name), 'maxBytes': 5000000, 'backupCount': 4,
                 'formatter': 'file_formatter',
                 },
+            'watcher_file': {
+                'level': 'DEBUG', 'class': 'logging.handlers.RotatingFileHandler',
+                'filename': os.path.join(usr_profile, 'img_watcher_' + log_file_name), 'maxBytes': 5000000,
+                'backupCount': 4, 'formatter': 'file_formatter',
+            },
             },
         'loggers': {
             'aeffchen_logger': {
                 'handlers': ['file', 'console'], 'propagate': False, 'level': 'INFO', },
             'watcher_logger': {
-                'handlers': ['file', 'console'], 'propagate': False, 'level': 'INFO', }
+                'handlers': ['watcher_file', 'console'], 'propagate': False, 'level': 'INFO', }
             }
         }
 
@@ -74,7 +79,12 @@ def setup_log_file(log_file_name=PFAD_AEFFCHEN_LOG_NAME):
 
 def delete_existing_logs(log_file):
     # Delete all log files xxx.log, xxx.log1 etc.
-    for file in glob.glob(log_file + '*'):
+    search_path = os.path.split(log_file)[0]
+    search_file_name = os.path.split(log_file)[-1]
+
+    search = search_path + '/*' + search_file_name + '*'
+
+    for file in glob.glob(search):
         try:
             os.remove(file)
         except OSError or FileNotFoundError as e:

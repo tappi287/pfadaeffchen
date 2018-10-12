@@ -43,6 +43,8 @@ de = get_translation()
 de.install()
 _ = de.gettext
 
+LOGGER = setup_logging('watcher_logger')
+
 
 class WatcherWindow(QtWidgets.QWidget):
     def __init__(self, app_class, mod_dir):
@@ -211,7 +213,7 @@ class WatcherApp(QtWidgets.QApplication):
 
 def start_watcher(mod_dir, render_path, scene_file, version, logging_queue):
     global LOGGER
-    LOGGER = setup_queued_logger(__name__, logging_queue)
+    LOGGER = setup_queued_logger('watcher_logger', logging_queue)
 
     app = WatcherApp(mod_dir, render_path, scene_file, version, logging_queue)
     app.exec_()

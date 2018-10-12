@@ -93,6 +93,8 @@ class ImageFileWatcher(QtCore.QThread):
         self.watch_active = False
         self.output_dir = Path(output_dir)
 
+        self.watcher_img_dict = dict()
+
         if scene_file:
             self.scene_file_name = Path(scene_file).stem
 
@@ -131,18 +133,6 @@ class ImageFileWatcher(QtCore.QThread):
         self.__previous_imgs = set()
 
     @property
-    def watcher_img_dict(self):
-        return self.__watcher_img_dict
-
-    @watcher_img_dict.setter
-    def watcher_img_dict(self, val):
-        self.__watcher_img_dict.update(val)
-
-    @watcher_img_dict.deleter
-    def watcher_img_dict(self):
-        self.__watcher_img_dict = dict()
-
-    @property
     def img_count(self):
         return self.__img_count
 
@@ -170,7 +160,7 @@ class ImageFileWatcher(QtCore.QThread):
         self.create_psd_requested = False
 
         # Resets directory file index
-        del self.watcher_img_dict
+        self.watcher_img_dict = dict()
 
         # Reset image count
         del self.img_count
@@ -210,12 +200,11 @@ class ImageFileWatcher(QtCore.QThread):
         LOGGER.error('Image File Watcher thread ending.')
 
     def watch_folder(self):
-        # Lock watcher img dict access
-        self.lock.acquire()
-
         img_dict = self.index_img_files(set_processed=False)
         self.report_changes(img_dict)
 
+        # Lock watcher img dict access
+        self.lock.acquire()
         self.watcher_img_dict = img_dict
         self.lock.release()
 
