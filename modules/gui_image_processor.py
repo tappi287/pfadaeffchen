@@ -449,6 +449,10 @@ class ImageFileWatcher(QtCore.QThread):
                     if img_file == img_path:
                         # If existing status was already processed, ignore method argument
                         processed = existing_status
+                    else:
+                        # Report change of processed status
+                        LOGGER.debug('Image detected as unprocessed. Setting %s to processed: %s', img_file.stem,
+                                     self.watcher_img_dict[img_file.stem].get('processed'))
 
         self.lock.release()
 
@@ -470,6 +474,8 @@ class ImageFileWatcher(QtCore.QThread):
             img_dict[img_file.stem] = dict(path=img_file, processed=True)
 
         self.watcher_img_dict = img_dict
+        LOGGER.debug('Image detection finished. Setting %s to processed: %s', img_file.stem,
+                     self.watcher_img_dict[img_file.stem].get('processed'))
 
         self.lock.release()
 
