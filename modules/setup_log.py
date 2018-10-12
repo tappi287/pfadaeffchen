@@ -20,6 +20,7 @@
         along with Pfad Aeffchen.  If not, see <http://www.gnu.org/licenses/>.
 """
 import os
+import glob
 import logging
 try:
     # Available from Python >3.2
@@ -34,6 +35,8 @@ from modules.setup_paths import get_user_directory
 
 def setup_log_file(log_file_name=PFAD_AEFFCHEN_LOG_NAME):
     usr_profile = get_user_directory()
+    log_file = os.path.join(usr_profile, log_file_name)
+    delete_existing_logs(log_file)
 
     log_conf = {
         'version': 1, 'disable_existing_loggers': True,
@@ -67,6 +70,16 @@ def setup_log_file(log_file_name=PFAD_AEFFCHEN_LOG_NAME):
         }
 
     logging.config.dictConfig(log_conf)
+
+
+def delete_existing_logs(log_file):
+    # Delete all log files xxx.log, xxx.log1 etc.
+    for file in glob.glob(log_file + '*'):
+        try:
+            os.remove(file)
+        except OSError or FileNotFoundError as e:
+            print('Could not delete existing log file: %s', file)
+            print(e)
 
 
 class JobLogFile(object):
