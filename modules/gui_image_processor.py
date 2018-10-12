@@ -210,11 +210,12 @@ class ImageFileWatcher(QtCore.QThread):
         LOGGER.error('Image File Watcher thread ending.')
 
     def watch_folder(self):
+        # Lock watcher img dict access
+        self.lock.acquire()
+
         img_dict = self.index_img_files(set_processed=False)
         self.report_changes(img_dict)
 
-        # Lock watcher img dict access
-        self.lock.acquire()
         self.watcher_img_dict = img_dict
         self.lock.release()
 
@@ -399,7 +400,7 @@ class ImageFileWatcher(QtCore.QThread):
 
     def add_image_processing_thread(self, img_file):
         # Create runnable and append to thread pool
-        img_thread = ProcessImage(img_file, self.mod_dir, self.image_processing_result, self.thread_status)
+        img_thread = ProcessImage(img_file, self.mod_dir, self.image_processing_result, self.thread_status, self.lock)
         self.thread_pool.start(img_thread)
 
         max_threads = self.thread_pool.maxThreadCount()
@@ -507,9 +508,10 @@ class ProcessImage(QtCore.QRunnable):
     detection_timeout.setTimerType(QtCore.Qt.VeryCoarseTimer)
     detection_timeout.setInterval(600000)
 
-    def __init__(self, img_file, mod_dir, result_callback, status_callback):
+    def __init__(self, img_file, mod_dir, result_callback, status_callback, lock):
         super(ProcessImage, self).__init__()
         self.process = None
+        self.lock = lock
         self.mod_dir = mod_dir
         self.img_file = img_file
         self.img_check_module = Path(self.mod_dir) / 'maya_mod/run_empty_img_check.py'
@@ -541,6 +543,9 @@ class ProcessImage(QtCore.QRunnable):
             LOGGER.error(e)
             self.signals.status.emit(_('Fehler im Bilderkennungsprozess:\n{}').format(e))
         finally:
+            # Block until we can safely access image watcher dict
+            self.lock.acquire()
+
             # Update processed status if image has not been removed
             if self.img_file.exists():
                 self.signals.status.emit(_('Bilderkennung abgeschlossen für {}. Bildinhalte erkannt.').format(img_name))
@@ -549,6 +554,7 @@ class ProcessImage(QtCore.QRunnable):
                 self.signals.status.emit(_('Bilderkennung abgeschlossen für {}. '
                                            '<i>Keine Bildinhalte erkannt.</i>').format(img_name)
                                          )
+            self.lock.release()
 
     def kill_process(self):
         if self.process:
