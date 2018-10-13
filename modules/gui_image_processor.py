@@ -329,8 +329,13 @@ class ImageFileWatcher(QtCore.QThread):
     def index_img_files(self, set_processed=False):
         img_dict = dict()
 
-        if not self.output_dir.exists():
+        try:
+            if not self.output_dir.exists():
+                LOGGER.error('Can not find image output directory. Nothing to index.')
+                return img_dict
+        except OSError as e:
             LOGGER.error('Can not find image output directory. Nothing to index.')
+            LOGGER.error(e)
             return img_dict
 
         for __img_file in self.output_dir.glob('*' + ImgParams.extension):
