@@ -33,10 +33,14 @@ from modules.app_globals import PFAD_AEFFCHEN_LOG_NAME
 from modules.setup_paths import get_user_directory
 
 
-def setup_log_file(log_file_name=PFAD_AEFFCHEN_LOG_NAME):
+def setup_log_file(log_file_name=PFAD_AEFFCHEN_LOG_NAME, delete_existing_log_files=False):
+    """ This should only be called once. It configures the logging module. All sub processes and
+    threads inherit their settings from this configuration. """
     usr_profile = get_user_directory()
     log_file = os.path.join(usr_profile, log_file_name)
-    delete_existing_logs(log_file)
+
+    if delete_existing_log_files:
+        delete_existing_logs(log_file)
 
     log_conf = {
         'version': 1, 'disable_existing_loggers': True,
@@ -60,17 +64,15 @@ def setup_log_file(log_file_name=PFAD_AEFFCHEN_LOG_NAME):
                 'filename': os.path.join(usr_profile, log_file_name), 'maxBytes': 5000000, 'backupCount': 4,
                 'formatter': 'file_formatter',
                 },
-            'watcher_file': {
-                'level': 'DEBUG', 'class': 'logging.handlers.RotatingFileHandler',
-                'filename': os.path.join(usr_profile, 'img_watcher_' + log_file_name), 'maxBytes': 5000000,
-                'backupCount': 4, 'formatter': 'file_formatter',
-            },
+            'null': {
+                'level': 'DEBUG', 'class': 'logging.NullHandler', 'formatter': 'file_formatter',
+                }
             },
         'loggers': {
             'aeffchen_logger': {
                 'handlers': ['file', 'console'], 'propagate': False, 'level': 'INFO', },
             'watcher_logger': {
-                'handlers': ['watcher_file', 'console'], 'propagate': False, 'level': 'INFO', }
+                'handlers': ['file', 'console'], 'propagate': False, 'level': 'DEBUG', },
             }
         }
 
@@ -188,8 +190,16 @@ def setup_log_queue_listener(logger, queue):
 
 
 def setup_queued_logger(name, queue):
+    """ Create a logger and at a queue handler """
     queue_handler = QueueHandler(queue)
     logger = logging.getLogger(name)
+    logger.addHandler(queue_handler)
+    return logger
+
+
+def add_queue_handler(logger, queue):
+    """ Add a queue handler to an existing logger """
+    queue_handler = QueueHandler(queue)
     logger.addHandler(queue_handler)
     return logger
 
@@ -198,8 +208,8 @@ def setup_logging(name=''):
     if name in ['aeffchen_logger', 'watcher_logger']:
         current_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         logger = logging.getLogger(name)
-        logger.info('Logging started for %s - %s', name, current_date)
         logger.setLevel(logging.DEBUG)
+        logger.info('Logging started for %s - %s', name, current_date)
     else:
         logger = logging.getLogger(name)
 

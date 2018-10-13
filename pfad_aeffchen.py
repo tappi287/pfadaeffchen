@@ -41,18 +41,6 @@ from modules.setup_log import setup_logging, setup_log_file, setup_log_queue_lis
 from modules.setup_paths import get_current_modules_dir
 from modules.app_globals import *
 
-# get MS Windows language
-os.environ.setdefault('LANGUAGE', get_ms_windows_language()[:2])
-
-# translate strings
-de = get_translation()
-de.install()
-_ = de.gettext
-
-# Setup Logger
-setup_log_file(PFAD_AEFFCHEN_LOG_NAME)
-LOGGER = setup_logging('aeffchen_logger')
-
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, app_class, mod_dir, version):
@@ -332,4 +320,16 @@ def main():
 
 
 if __name__ == '__main__':
+    # get MS Windows language
+    os.environ.setdefault('LANGUAGE', get_ms_windows_language()[:2])
+
+    # translate strings
+    de = get_translation()
+    de.install()
+    _ = de.gettext
+
+    # Setup logging
+    setup_log_file(PFAD_AEFFCHEN_LOG_NAME, delete_existing_log_files=True)
+    LOGGER = setup_logging('aeffchen_logger')
+
     main()

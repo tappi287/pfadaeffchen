@@ -32,7 +32,7 @@ from PyQt5 import QtWidgets, QtCore
 from PyQt5.uic import loadUi
 
 from modules.detect_lang import get_ms_windows_language, get_translation
-from modules.setup_log import setup_logging, setup_queued_logger
+from modules.setup_log import setup_queued_logger
 from modules.socket_server import run_watcher_server
 from maya_mod.socket_client import send_message
 from modules.gui_image_processor import ImageFileWatcher
@@ -42,8 +42,6 @@ from modules.app_globals import *
 de = get_translation()
 de.install()
 _ = de.gettext
-
-LOGGER = setup_logging('watcher_logger')
 
 
 class WatcherWindow(QtWidgets.QWidget):
@@ -147,7 +145,7 @@ class WatcherApp(QtWidgets.QApplication):
         self.server.shutdown()
         self.server.server_close()
 
-        LOGGER.debug('Watcher is shutting down Watcher Image File Watcher.')
+        LOGGER.info('Watcher is shutting down Watcher Image File Watcher.')
         self.stop_image_watcher()
 
         self.app_ui.close()
@@ -165,8 +163,10 @@ class WatcherApp(QtWidgets.QApplication):
 
         # Start image watcher thread
         self.image_watcher.start(priority=QtCore.QThread.LowPriority)
+        LOGGER.info('Image Watcher Thread started.')
 
     def stop_image_watcher(self):
+        LOGGER.debug('Stopping Image Watcher Thread.')
         if self.image_watcher:
             if self.image_watcher.isRunning():
                 self.image_watcher.requestInterruption()
@@ -175,6 +175,8 @@ class WatcherApp(QtWidgets.QApplication):
     def signal_receiver(self, msg):
         if msg.startswith('COMMAND'):
             socket_command = msg.replace('COMMAND ', '')
+
+            LOGGER.debug('Image Watcher Process received: %s', socket_command)
 
             if socket_command == 'HIDE_WINDOW':
                 self.app_ui.hide()

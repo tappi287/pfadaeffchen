@@ -25,7 +25,7 @@ from pathlib import Path
 from PyQt5 import QtCore
 
 from modules.detect_lang import get_translation
-from modules.setup_log import setup_queued_logger
+from modules.setup_log import add_queue_handler, setup_logging, setup_queued_logger
 from modules.check_file_access import CheckFileAccess
 from modules.app_globals import *
 from maya_mod.start_mayapy import run_module_in_standalone
@@ -86,9 +86,11 @@ class ImageFileWatcher(QtCore.QThread):
     scene_file_name = _('KeineSzenenDatei')
 
     def __init__(self, parent, output_dir, scene_file, mod_dir, logging_queue):
+        super(ImageFileWatcher, self).__init__(parent=parent)
+
+        # Add queue handler to logger
         global LOGGER
         LOGGER = setup_queued_logger(__name__, logging_queue)
-        super(ImageFileWatcher, self).__init__(parent=parent)
 
         self.watch_active = False
         self.output_dir = Path(output_dir)

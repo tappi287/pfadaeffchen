@@ -87,4 +87,4 @@ UI_FILE_SUB = 'res/Renderprozess_Depp.ui'
 UI_FILE_LED = 'res/LED_widget.ui'
 
 PFAD_AEFFCHEN_LOG_NAME = 'pfad_aeffchen.log'
-WATCHER_PROCESS_LOG_NAME = 'pfad_aeffchen_watcher.log'
+WATCHER_PROCESS_LOG_NAME = 'image_watcher_pfad_aeffchen.log'

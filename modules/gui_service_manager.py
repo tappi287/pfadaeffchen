@@ -27,7 +27,6 @@ import os
 import socket
 import copy
 import json
-import logging
 from datetime import datetime, timedelta
 from PyQt5.QtCore import QThread, pyqtSignal, QTimer
 from PyQt5.QtCore import Qt
