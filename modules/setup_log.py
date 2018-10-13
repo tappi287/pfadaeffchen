@@ -101,6 +101,8 @@ class JobLogFile(object):
     usr_profile = get_user_directory()
     logger = None
 
+    # TODO: Add image watcher log entries
+
     @classmethod
     def _reset(cls):
         cls.fh = None
@@ -113,7 +115,7 @@ class JobLogFile(object):
         cls._reset()
 
         cls.logger = logging.getLogger('JobLogger')
-        cls.logger.setLevel(logging.INFO)
+        cls.logger.setLevel(logging.DEBUG)
 
         filename = datetime.now().strftime('Job_%Y-%m-%d_%H-%M-%S.log')
         cls.current_path = os.path.join(cls.usr_profile, filename)

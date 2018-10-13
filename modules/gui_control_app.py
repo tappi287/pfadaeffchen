@@ -642,6 +642,10 @@ class ControlApp(QtCore.QObject, LedControl):
             gui.setEnabled(enable)
 
     def quit_app(self):
+        # Abort running job
+        if self.current_job != self.empty_job:
+            self.abort_running_job()
+
         # End service announcer
         self.stop_render_service()
         self.update_status(_('Render Service beendet.'))
