@@ -298,7 +298,16 @@ def read_version(mod_dir):
     return version
 
 
+def setup_aeffchen_log():
+    global LOGGER
+    setup_log_file(PFAD_AEFFCHEN_LOG_NAME, delete_existing_log_files=True)
+    LOGGER = setup_logging('aeffchen_logger')
+
+
 def main():
+    # Setup log
+    setup_aeffchen_log()
+
     # Prepare a multiprocess logging queue
     logging_queue = Queue(-1)
 
@@ -328,8 +337,8 @@ def main():
 
 
 if __name__ == '__main__':
-    # Setup logging
-    setup_log_file(PFAD_AEFFCHEN_LOG_NAME, delete_existing_log_files=True)
-    LOGGER = setup_logging('aeffchen_logger')
-
+    """ 
+        Only in debug! Nsis installer will start main() directly.
+        Do not declare anything here!
+    """
     main()

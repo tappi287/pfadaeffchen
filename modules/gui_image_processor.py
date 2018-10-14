@@ -77,6 +77,11 @@ class ImageFileWatcher(QtCore.QThread):
     # Scan interval in seconds
     interval = 15
 
+    # Unprocessed images timeout
+    unprocessed_imgs_timer = QtCore.QTimer()
+    unprocessed_imgs_timer.setSingleShot(True)
+    unprocessed_imgs_timer.setInterval(240000)
+
     # Thread Pool
     # increase thread timeout to 4 mins
     thread_timeout = 240000
@@ -96,6 +101,7 @@ class ImageFileWatcher(QtCore.QThread):
         self.output_dir = Path(output_dir)
 
         self.watcher_img_dict = dict()
+        self.processed_img_dict = dict()
 
         if scene_file:
             self.scene_file_name = Path(scene_file).stem
@@ -122,6 +128,7 @@ class ImageFileWatcher(QtCore.QThread):
         self.psd_created_signal.connect(self.parent.psd_created)
         self.img_job_failed_signal.connect(self.parent.img_job_failed)
         self.led_signal.connect(self.parent.led)
+        self.unprocessed_imgs_timer.timeout.connect(self.unprocessed_imgs_timed_out)
 
         # Init message
         self.status_signal.emit(_('Bilderkennung verfügt über {0:02d} parallel ausführbare '
@@ -129,8 +136,7 @@ class ImageFileWatcher(QtCore.QThread):
                                   '{1:02d} Threads aktiv.')
                                 .format(thread_count, self.thread_pool.activeThreadCount()))
 
-        # Propertys
-        self.__watcher_img_dict = dict()
+        # Properties
         self.__img_count = 0
         self.__previous_imgs = set()
 
@@ -242,6 +248,10 @@ class ImageFileWatcher(QtCore.QThread):
         self.led_signal.emit(2, 0)
         self.watch_active = True
 
+    def unprocessed_imgs_timed_out(self):
+        # Enforce Psd creation, verification of unprocessed images timed out
+        self.create_psd_request(force_psd_creation=True)
+
     def create_psd_request(self, force_psd_creation=False):
         """ Called from mother ship """
         self.create_psd_requested = True
@@ -258,7 +268,6 @@ class ImageFileWatcher(QtCore.QThread):
             LOGGER.debug('Can not create PSD yet. Image detection threads active. Retrying on next directory index.')
             return
 
-        create_psd = False
         if not len(self.watcher_img_dict):
             # No images to create PSD from, set Job as failed
             LOGGER.error('PSD requested but no images to process. Resetting image watcher.')
@@ -267,20 +276,33 @@ class ImageFileWatcher(QtCore.QThread):
             self.deactivate_watch()
             return
 
+        # Check for unprocessed files
+        not_processed = list()
+        not_processed_watcher_dict = list()
+        create_psd = True
+
         for __i in self.watcher_img_dict.items():
             img_key, img_file_dict = __i
 
             if not img_file_dict.get('processed'):
                 # Some image(s) are not processed yet, skip
-                LOGGER.debug('Can not create PSD yet. Some indexed images are not yet processed.'
-                             'Retrying on next directory index.')
-                if self.force_psd_creation:
-                    continue
-                else:
-                    break
-        else:
-            # Break never called - everything should be processed
-            create_psd = True
+                create_psd = False
+                not_processed_watcher_dict.append(f'{img_key} - {img_file_dict.get("path")}')
+
+            if img_key not in self.processed_img_dict.keys():
+                create_psd = False
+                not_processed.append(f'{img_key} - {img_file_dict.get("path")}')
+
+        if not create_psd:
+            # Force PSD creation after timeout
+            if not self.unprocessed_imgs_timer.isActive():
+                self.unprocessed_imgs_timer.start()
+
+            LOGGER.debug('Can not create PSD yet. Some indexed images are not yet processed. '
+                         'Retrying on next directory index.')
+            LOGGER.error('Possibly unprocessed image files:\n%s', not_processed)
+            LOGGER.error('Possibly unprocessed image files according to watcher_img_dict:\n%s',
+                         not_processed_watcher_dict)
 
         # Create psd if every image file is processed OR if force PSD creation requested
         if create_psd or self.force_psd_creation:
@@ -477,6 +499,8 @@ class ImageFileWatcher(QtCore.QThread):
                      self.watcher_img_dict[img_file.stem].get('processed'))
 
         self.release_lock('image_processing_result')
+
+        self.processed_img_dict[img_file.stem] = dict(path=img_file, processed=True)
 
         # Switch Red LED off
         self.led_signal.emit(0, 2)
