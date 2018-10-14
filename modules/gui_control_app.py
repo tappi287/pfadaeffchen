@@ -642,6 +642,9 @@ class ControlApp(QtCore.QObject, LedControl):
             gui.setEnabled(enable)
 
     def quit_app(self):
+        # Avoid starting further jobs in the queue
+        self.queue_next_job_signal.disconnect()
+
         # Abort running job
         if self.current_job != self.empty_job:
             self.abort_running_job()
