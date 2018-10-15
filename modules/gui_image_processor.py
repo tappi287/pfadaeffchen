@@ -327,6 +327,8 @@ class ImageFileWatcher(QtCore.QThread):
         self.psd_created_signal.emit()
         self.led_signal.emit(0, 2)
 
+        self.deactivate_watch()
+
     def change_output_dir(self, directory):
         """
             Change watched directory and reset existing image entries
