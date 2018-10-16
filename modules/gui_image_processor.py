@@ -19,7 +19,6 @@
         You should have received a copy of the GNU General Public License
         along with Pfad Aeffchen.  If not, see <http://www.gnu.org/licenses/>.
 """
-import threading
 from time import sleep, time
 from pathlib import Path
 from PyQt5 import QtCore
@@ -102,6 +101,7 @@ class ImageFileWatcher(QtCore.QThread):
 
         self.watcher_img_dict = dict()
         self.processed_img_dict = dict()
+        self.unprocessed_imgs_timer.timeout.connect(self.unprocessed_imgs_timed_out)
 
         if scene_file:
             self.scene_file_name = Path(scene_file).stem
@@ -119,16 +119,12 @@ class ImageFileWatcher(QtCore.QThread):
         self.thread_pool.setMaxThreadCount(thread_count)
         self.thread_pool.setExpiryTimeout(self.thread_timeout)
 
-        # Prepare a thread lock
-        self.lock = threading.Lock()
-
         self.status_signal.connect(self.parent.signal_receiver)
         self.file_created_signal.connect(self.parent.file_created)
         self.file_removed_signal.connect(self.parent.file_removed)
         self.psd_created_signal.connect(self.parent.psd_created)
         self.img_job_failed_signal.connect(self.parent.img_job_failed)
         self.led_signal.connect(self.parent.led)
-        self.unprocessed_imgs_timer.timeout.connect(self.unprocessed_imgs_timed_out)
 
         # Init message
         self.status_signal.emit(_('Bilderkennung verfügt über {0:02d} parallel ausführbare '
@@ -164,25 +160,14 @@ class ImageFileWatcher(QtCore.QThread):
     def previous_imgs(self):
         self.__previous_imgs = set()
 
-    def acquire_lock(self, name: str='-not specified-'):
-        LOGGER.debug('0 - ImageFileWatcher method "%s" acquires thread lock.', name)
-        self.lock.acquire()
-        LOGGER.debug('1 - "%s" acquired thread lock.', name)
-
-    def release_lock(self, name: str='-not specified-'):
-        self.lock.release()
-        LOGGER.debug('2 - ImageFileWatcher method "%s" released thread lock.', name)
-
     def reset(self):
         self.create_psd_requested = False
 
         # Clear queue of QRunnables thar are not started yet
         self.thread_pool.clear()
 
-        self.acquire_lock('reset')
         # Resets directory file index
         self.watcher_img_dict = dict()
-        self.release_lock('reset')
 
         # Reset image count
         del self.img_count
@@ -222,20 +207,18 @@ class ImageFileWatcher(QtCore.QThread):
         LOGGER.error('Image File Watcher thread ending.')
 
     def watch_folder(self):
-        img_dict = self.index_img_files(set_processed=False)
+        img_dict = self.index_img_files()
         self.report_changes(img_dict)
 
         # Lock watcher img dict access
-        self.acquire_lock('watch_folder')
         self.watcher_img_dict = img_dict
-        self.release_lock('watch_folder')
 
     def initial_directory_index(self):
         # Resets property
         self.reset()
 
         # Index existing files on initial watch
-        self.watcher_img_dict = self.index_img_files(set_processed=True)
+        self.watcher_img_dict = self.index_img_files()
 
         LOGGER.info('Image File Watcher directory changed. Found %s already existing files.',
                     len(self.watcher_img_dict))
@@ -249,8 +232,10 @@ class ImageFileWatcher(QtCore.QThread):
         self.watch_active = True
 
     def unprocessed_imgs_timed_out(self):
-        # Enforce Psd creation, verification of unprocessed images timed out
+        """ Enforce Psd creation, verification of unprocessed images timed out """
         self.create_psd_request(force_psd_creation=True)
+        self.status_signal.emit(_('Fehler: Überprüfung bereits bearbeiteter Bilder fehlgeschlagen. PSD Erstellung wird '
+                                  'nun erzwungen.'))
 
     def create_psd_request(self, force_psd_creation=False):
         """ Called from mother ship """
@@ -278,16 +263,10 @@ class ImageFileWatcher(QtCore.QThread):
 
         # Check for unprocessed files
         not_processed = list()
-        not_processed_watcher_dict = list()
         create_psd = True
 
         for __i in self.watcher_img_dict.items():
             img_key, img_file_dict = __i
-
-            if not img_file_dict.get('processed'):
-                # Some image(s) are not processed yet, skip
-                create_psd = False
-                not_processed_watcher_dict.append(f'{img_key} - {img_file_dict.get("path")}')
 
             if img_key not in self.processed_img_dict.keys():
                 create_psd = False
@@ -300,9 +279,9 @@ class ImageFileWatcher(QtCore.QThread):
 
             LOGGER.debug('Can not create PSD yet. Some indexed images are not yet processed. '
                          'Retrying on next directory index.')
-            LOGGER.error('Possibly unprocessed image files:\n%s', not_processed)
-            LOGGER.error('Possibly unprocessed image files according to watcher_img_dict:\n%s',
-                         not_processed_watcher_dict)
+            LOGGER.error('Possibly unprocessed image files:\n%s\n'
+                         'unprocessed timeout remaining: %s',
+                         not_processed, self.unprocessed_imgs_timer.remainingTime())
 
         # Create psd if every image file is processed OR if force PSD creation requested
         if create_psd or self.force_psd_creation:
@@ -350,7 +329,7 @@ class ImageFileWatcher(QtCore.QThread):
         self.scene_file_name = Path(file).stem
         self.status_signal.emit(_('Szenendatei geändert zu: {}').format(self.scene_file_name))
 
-    def index_img_files(self, set_processed=False):
+    def index_img_files(self):
         img_dict = dict()
 
         try:
@@ -381,8 +360,6 @@ class ImageFileWatcher(QtCore.QThread):
 
             # Create image file dict entry
             img_dict.update({img_key: dict(path=__img_file)})
-            # Update processed status
-            img_dict.get(img_key).update(self.set_image_processed(__img_file, set_processed))
 
         return img_dict
 
@@ -434,7 +411,7 @@ class ImageFileWatcher(QtCore.QThread):
 
     def add_image_processing_thread(self, img_file):
         # Create runnable and append to thread pool
-        img_thread = ProcessImage(img_file, self.mod_dir, self.image_processing_result, self.thread_status, self.lock)
+        img_thread = ProcessImage(img_file, self.mod_dir, self.image_processing_result, self.thread_status)
         self.thread_pool.start(img_thread)
 
         max_threads = self.thread_pool.maxThreadCount()
@@ -452,56 +429,14 @@ class ImageFileWatcher(QtCore.QThread):
 
         LOGGER.debug('Watcher found removed files: %s', rem_file_set)
 
-        # Lock watcher img dict access
-        self.acquire_lock('check_for_removed_files')
-
         # Reset watcher img dict
         self.watcher_img_dict = dict()
         self.watcher_img_dict = img_dict
 
-        self.release_lock('check_for_removed_files')
-
         self.file_removed_signal.emit(rem_file_set)
-
-    def set_image_processed(self, img_file: Path, processed: bool):
-        img_entry = self.watcher_img_dict.get(img_file.stem)
-
-        # If file exists in existing image entries get processed status from existing entry.
-        # If entry is already set as processed, leave this status intact.
-        # (and ignore method argument {processed: bool})
-        if img_entry:
-            existing_status = img_entry.get('processed')
-
-            if existing_status is not None:
-                img_path = img_entry.get('path')
-
-                if img_path:
-                    # Paths of existing entry and current image match?
-                    if img_file == img_path:
-                        # If existing status was already processed, ignore method argument
-                        processed = existing_status
-                    else:
-                        # Report change of processed status
-                        LOGGER.debug('Image detected as unprocessed. Setting %s to processed: %s', img_file.stem,
-                                     self.watcher_img_dict[img_file.stem].get('processed'))
-
-        return {'processed': processed}
 
     def image_processing_result(self, img_file: Path):
         """ Called from image processing thread """
-        # Lock watcher img dict access
-        self.acquire_lock('image_processing_result')
-
-        file_dict = self.watcher_img_dict.get(img_file.stem)
-
-        if file_dict:
-            file_dict.update({'processed': True})
-
-        LOGGER.debug('Image detection finished. Setting %s to processed: %s', img_file.stem,
-                     self.watcher_img_dict[img_file.stem].get('processed'))
-
-        self.release_lock('image_processing_result')
-
         self.processed_img_dict[img_file.stem] = dict(path=img_file, processed=True)
 
         # Switch Red LED off
@@ -532,10 +467,9 @@ class ProcessImage(QtCore.QRunnable):
     detection_timeout.setTimerType(QtCore.Qt.VeryCoarseTimer)
     detection_timeout.setInterval(600000)
 
-    def __init__(self, img_file, mod_dir, result_callback, status_callback, lock):
+    def __init__(self, img_file, mod_dir, result_callback, status_callback):
         super(ProcessImage, self).__init__()
         self.process = None
-        self.lock = lock
         self.mod_dir = mod_dir
         self.img_file = img_file
         self.img_check_module = Path(self.mod_dir) / 'maya_mod/run_empty_img_check.py'
@@ -567,10 +501,6 @@ class ProcessImage(QtCore.QRunnable):
             LOGGER.error(e)
             self.signals.status.emit(_('Fehler im Bilderkennungsprozess:\n{}').format(e))
         finally:
-            # Block until we can safely access image watcher dict
-            LOGGER.debug('QRunnable for %s acquires lock.', self.img_file.stem)
-            self.lock.acquire()
-
             # Update processed status if image has not been removed
             if self.img_file.exists():
                 self.signals.status.emit(_('Bilderkennung abgeschlossen für {}. Bildinhalte erkannt.').format(img_name))
@@ -579,8 +509,6 @@ class ProcessImage(QtCore.QRunnable):
                 self.signals.status.emit(_('Bilderkennung abgeschlossen für {}. '
                                            '<i>Keine Bildinhalte erkannt.</i>').format(img_name)
                                          )
-            self.lock.release()
-            LOGGER.debug('QRunnable for %s released lock.', self.img_file.stem)
 
     def kill_process(self):
         if self.process:
