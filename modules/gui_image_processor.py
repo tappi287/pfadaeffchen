@@ -22,6 +22,7 @@
 from time import sleep, time
 from pathlib import Path
 from PyQt5 import QtCore
+from subprocess import TimeoutExpired
 
 from modules.detect_lang import get_translation
 from modules.setup_log import add_queue_handler, setup_logging, setup_queued_logger
@@ -459,13 +460,7 @@ class ProcessImageSignals(QtCore.QObject):
 
 
 class ProcessImage(QtCore.QRunnable):
-    file_lock_timeout = 30.0
-
-    # Image process detection timeout
-    # in case a maya standalone thread get's stuck, we will continue after 10 minutes
-    detection_timeout = QtCore.QTimer()
-    detection_timeout.setTimerType(QtCore.Qt.VeryCoarseTimer)
-    detection_timeout.setInterval(600000)
+    image_process_timeout = 360  # 6 minutes
 
     def __init__(self, img_file, mod_dir, result_callback, status_callback):
         super(ProcessImage, self).__init__()
@@ -479,48 +474,58 @@ class ProcessImage(QtCore.QRunnable):
         self.signals.result.connect(result_callback)
         self.signals.status.connect(status_callback)
 
-        # Prepare timeout
-        self.detection_timeout.timeout.connect(self.kill_process)
-
     def run(self):
         # Hopefully avoid race conditions while accessing files
         sleep(3)
 
-        img_name = self.img_file.name
+        self.run_process()
+        self.detect_result()
 
-        self.detection_timeout.start()
-
-        # Run process in try-except to avoid re-running this QRunnable on process errors
+    def run_process(self):
+        """ Run Maya standalone to detect and delete empty image file """
         try:
-            # Run Maya standalone to detect and delete empty image file
             LOGGER.debug('Running image detection process for %s', self.img_file.as_posix())
-            self.process = run_module_in_standalone(
-                self.img_check_module.as_posix(), self.img_file.as_posix(), self.mod_dir)
 
-            #TODO implent communicate
-            proc = subprocess.Popen(...)
-            try:
-                outs, errs = proc.communicate(timeout=15)
-            except TimeoutExpired:
-                proc.kill()
-                outs, errs = proc.communicate()
+            self.process = run_module_in_standalone(
+                self.img_check_module.as_posix(),
+                self.img_file.as_posix(),
+                self.mod_dir,
+                pipe_output=True
+                )
         except Exception as e:
             LOGGER.error(e)
             self.signals.status.emit(_('Fehler im Bilderkennungsprozess:\n{}').format(e))
-        finally:
-            # Update processed status if image has not been removed
-            if self.img_file.exists():
-                self.signals.status.emit(_('Bilderkennung abgeschlossen für {}. Bildinhalte erkannt.').format(img_name))
-                self.signals.result.emit(self.img_file)
-            else:
-                self.signals.status.emit(_('Bilderkennung abgeschlossen für {}. '
-                                           '<i>Keine Bildinhalte erkannt.</i>').format(img_name)
-                                         )
+
+            # Process could not be started, abort
+            return None, None
+
+        # Wait for the process to finish
+        try:
+            outs, errs = self.process.communicate(input=None, timeout=self.image_process_timeout)
+        except TimeoutExpired:
+            LOGGER.error('Image detection process timed out. Killing process.')
+            self.kill_process()
+            outs, errs = self.process.communicate(input=None)
+            LOGGER.error('Output: %s\nErrors: %s', outs, errs)
+
+        return outs, errs
+
+    def detect_result(self):
+        """ Detect if the image was deleted and report result to parent """
+        if self.img_file.exists():
+            self.signals.status.emit(_('Bilderkennung abgeschlossen für {}. Bildinhalte erkannt.')
+                                     .format(self.img_file.name)
+                                     )
+            self.signals.result.emit(self.img_file)
+        else:
+            self.signals.status.emit(_('Bilderkennung abgeschlossen für {}. '
+                                       '<i>Keine Bildinhalte erkannt.</i>')
+                                     .format(self.img_file.name)
+                                     )
 
     def kill_process(self):
         if self.process:
             try:
-                LOGGER.info('Attempting to kill Image content detection process.')
                 self.process.kill()
                 LOGGER.info('Image content detection process killed.')
             except Exception as e:
