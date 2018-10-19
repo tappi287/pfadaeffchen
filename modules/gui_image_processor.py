@@ -496,7 +496,14 @@ class ProcessImage(QtCore.QRunnable):
             LOGGER.debug('Running image detection process for %s', self.img_file.as_posix())
             self.process = run_module_in_standalone(
                 self.img_check_module.as_posix(), self.img_file.as_posix(), self.mod_dir)
-            self.process.wait()
+
+            #TODO implent communicate
+            proc = subprocess.Popen(...)
+            try:
+                outs, errs = proc.communicate(timeout=15)
+            except TimeoutExpired:
+                proc.kill()
+                outs, errs = proc.communicate()
         except Exception as e:
             LOGGER.error(e)
             self.signals.status.emit(_('Fehler im Bilderkennungsprozess:\n{}').format(e))
