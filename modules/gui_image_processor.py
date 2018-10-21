@@ -214,6 +214,9 @@ class ImageFileWatcher(QtCore.QThread):
         if self.thread_pool.activeThreadCount() > 0:
             self.led_signal.emit(0, 1)
 
+        # Make sure we only call this loop if thread is not busy with eg. detecting images
+        self.watch_timer.stop()
+
         # Process output folder
         if self.watch_active:
             self.led_signal.emit(2, 1)
@@ -227,6 +230,9 @@ class ImageFileWatcher(QtCore.QThread):
             self.led_signal.emit(2, 2)
 
         self.led_signal.emit(1, 0)
+
+        # Watcher is ready again, re-schedule a run in next interval
+        self.watch_timer.start()
 
     def watch_folder(self):
         img_dict = self.index_img_files()
@@ -428,7 +434,9 @@ class ImageFileWatcher(QtCore.QThread):
     def add_new_file_set_as_threads(self, img_dict, new_file_set):
         """ check_for_created_files helper """
         for img_key in new_file_set:
-            img_file = img_dict.get(img_key).get('path')
+            img_entry = img_dict.get(img_key)
+            if img_entry:
+                img_file = img_entry.get('path')
 
             if img_file:
                 self.add_image_processing_thread(img_file)
@@ -455,6 +463,7 @@ class ImageFileWatcher(QtCore.QThread):
                                 )
 
     def detect_empty_image_pil(self, img_file: Path):
+        self.led_signal.emit(0, 1)
         image_is_empty = True
 
         # Detect image contents
@@ -487,6 +496,7 @@ class ImageFileWatcher(QtCore.QThread):
         # Remove the empty file
         try:
             os.remove(img_file)
+            self.led_signal.emit(0, 2)
         except Exception as e:
             LOGGER.error('Could not delete empty image file. %s', e)
             # Set un-removable files as processed
