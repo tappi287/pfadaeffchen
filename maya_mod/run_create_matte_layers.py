@@ -65,7 +65,6 @@ import maya_mod.maya_render_settings as maya_render_settings
 from maya_mod.maya_tappitilitys import MayaFileUtils as mfu, load_csb_plugin, MayaUtils as mu
 from modules.setup_log import setup_logging
 from maya_mod.socket_client import send_message
-from modules.app_globals import *
 
 LOGGER = setup_logging(__name__)
 LOGGER.info('Running create matte layers in Maya Standalone with args:\n%s', args)
@@ -83,7 +82,6 @@ def main():
 
     # Set rendering path
     img_path = os.path.abspath(args.render_path)
-    img_ext = ImgParams.extension
 
     # Create rendering dir
     if not os.path.exists(img_path):

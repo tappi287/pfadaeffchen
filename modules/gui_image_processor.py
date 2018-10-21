@@ -20,7 +20,8 @@
         along with Pfad Aeffchen.  If not, see <http://www.gnu.org/licenses/>.
 """
 import os
-import imageio
+import numpy as np
+from PIL import Image
 from time import sleep, time
 from pathlib import Path
 from PyQt5 import QtCore
@@ -466,18 +467,20 @@ class ImageFileWatcher(QtCore.QThread):
         self.led_signal.emit(0, 1)
         image_is_empty = True
 
-        # Detect image contents
+        # --- Detect image contents ---
         try:
-            img = imageio.imread(img_file.as_posix())
+            with Image.open(img_file.as_posix()) as img:
+                img_array = np.asarray(img)
 
-            if img.max() > 0:
-                image_is_empty = False
+                if img_array.max() > 0:
+                    image_is_empty = False
 
             del img
         except Exception as e:
             LOGGER.error('Error reading file for image detection: %s', e)
 
-        # Result
+        # --- Result ---
+        # Image is -not- empty
         if not image_is_empty:
             LOGGER.debug('Image containing non-zero pixel data detected: %s', img_file.stem)
             self.status_signal.emit(_('Bilderkennung abgeschlossen für {}. Bildinhalte erkannt.')
