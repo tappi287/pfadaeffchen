@@ -19,6 +19,8 @@
         You should have received a copy of the GNU General Public License
         along with Pfad Aeffchen.  If not, see <http://www.gnu.org/licenses/>.
 """
+import os
+import imageio
 from time import sleep, time
 from pathlib import Path
 from PyQt5 import QtCore
@@ -82,6 +84,10 @@ class ImageFileWatcher(QtCore.QThread):
     unprocessed_imgs_timer.setSingleShot(True)
     unprocessed_imgs_timer.setInterval(240000)
 
+    test_timer = QtCore.QTimer()
+    test_timer.setSingleShot(True)
+    test_timer.setInterval(5000)
+
     # Thread Pool
     # increase thread timeout to 4 mins
     thread_timeout = 240000
@@ -102,7 +108,9 @@ class ImageFileWatcher(QtCore.QThread):
 
         self.watcher_img_dict = dict()
         self.processed_img_dict = dict()
+
         self.unprocessed_imgs_timer.timeout.connect(self.unprocessed_imgs_timed_out)
+        self.test_timer.timeout.connect(self.test_target)
 
         if scene_file:
             self.scene_file_name = Path(scene_file).stem
@@ -161,6 +169,10 @@ class ImageFileWatcher(QtCore.QThread):
     def previous_imgs(self):
         self.__previous_imgs = set()
 
+    def test_target(self):
+        self.test_timer.start(8000)
+        LOGGER.debug('Test timer fired and restarted. Remaining time: %s', self.test_timer.remainingTime())
+
     def reset(self):
         self.create_psd_requested = False
 
@@ -185,6 +197,7 @@ class ImageFileWatcher(QtCore.QThread):
         if self.watch_active:
             self.initial_directory_index()
 
+        #TODO No event loop!? Timer not fireing
         while not self.isInterruptionRequested():
             # Red LED on while image detection threads active
             if self.thread_pool.activeThreadCount() > 0:
@@ -276,6 +289,7 @@ class ImageFileWatcher(QtCore.QThread):
         if not create_psd:
             # Force PSD creation after timeout
             if not self.unprocessed_imgs_timer.isActive():
+                LOGGER.debug('Starting unprocessed images timeout.')
                 self.unprocessed_imgs_timer.start()
 
             LOGGER.debug('Can not create PSD yet. Some indexed images are not yet processed. '
@@ -411,16 +425,61 @@ class ImageFileWatcher(QtCore.QThread):
                 self.add_image_processing_thread(img_file)
 
     def add_image_processing_thread(self, img_file):
+        # -----
+        # Use pillow detection if format is not Maya IFF files
+        if img_file.suffix[-3:] != ImgParams.maya_detection_format:
+            self.status_signal.emit(_('<i>{0}</i> wird in Pillow Bilderkennung untersucht.').format(img_file.name))
+            self.detect_empty_image_pil(img_file)
+            return
+
+        # -----
+        # Maya image detection process
         # Create runnable and append to thread pool
         img_thread = ProcessImage(img_file, self.mod_dir, self.image_processing_result, self.thread_status)
         self.thread_pool.start(img_thread)
 
-        max_threads = self.thread_pool.maxThreadCount()
-        current_threads = self.thread_pool.activeThreadCount()
-
         self.status_signal.emit(_('<i>{0}</i> zur Bilderkennung eingereiht. '
-                                  '{1:02d}/{2:02d} Threads aktiv.').format(img_file.name, current_threads, max_threads)
+                                  '{1:02d}/{2:02d} Threads aktiv.')
+                                .format(img_file.name,
+                                        self.thread_pool.activeThreadCount(),
+                                        self.thread_pool.maxThreadCount())
                                 )
+
+    def detect_empty_image_pil(self, img_file: Path):
+        image_is_empty = True
+
+        # Detect image contents
+        try:
+            img = imageio.imread(img_file.as_posix())
+
+            if img.max() > 0:
+                image_is_empty = False
+
+            del img
+        except Exception as e:
+            LOGGER.error('Error reading file for image detection: %s', e)
+
+        # Result
+        if not image_is_empty:
+            self.status_signal.emit(_('Bilderkennung abgeschlossen für {}. Bildinhalte erkannt.')
+                                    .format(img_file.name)
+                                     )
+            self.image_processing_result(img_file)
+            return
+
+        # Image is empty
+        self.status_signal.emit(_('Bilderkennung abgeschlossen für {}. '
+                                  '<i>Keine Bildinhalte erkannt.</i>')
+                                .format(img_file.name)
+                                 )
+
+        # Remove the empty file
+        try:
+            os.remove(img_file)
+        except Exception as e:
+            LOGGER.error('Could not delete empty image file. %s', e)
+            # Set un-removable files as processed
+            self.image_processing_result(img_file)
 
     def check_for_removed_files(self, img_dict):
         rem_file_set = self.get_file_difference(old_dict=img_dict, new_dict=self.watcher_img_dict)

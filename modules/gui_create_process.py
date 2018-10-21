@@ -30,6 +30,7 @@ from PyQt5 import QtCore
 from maya_mod.start_command_line_render import run_command_line_render
 from maya_mod.start_mayapy import run_module_in_standalone
 from modules.setup_log import setup_queued_logger
+from modules.app_globals import ImgParams
 
 
 def log_subprocess_output(pipe):
@@ -179,7 +180,9 @@ class RunLayerCreationProcess(threading.Thread):
 
         try:
             self.render_process = run_command_line_render(
-                self.render_scene_file, self.render_path, 3840, 2160, self.version, LOGGER)
+                self.render_scene_file, self.render_path, 3840, 2160,
+                self.version, LOGGER,
+                image_format=ImgParams.extension)
             LOGGER.info('Maya batch rendering started.')
         except Exception as e:
             LOGGER.error(e)

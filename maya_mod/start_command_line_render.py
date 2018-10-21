@@ -49,7 +49,7 @@ import subprocess as sp
 from modules.setup_paths import get_mayapy_path
 
 
-def run_command_line_render(my_file, out_dir, res_x, res_y, version, logger):
+def run_command_line_render(my_file, out_dir, res_x, res_y, version, logger, image_format: str='iff'):
     global LOGGER
     LOGGER = logger
 
@@ -61,9 +61,10 @@ def run_command_line_render(my_file, out_dir, res_x, res_y, version, logger):
     res_x = '-x ' + str(res_x) + ' '
     res_y = '-y ' + str(res_y) + ' '
     my_file = '"' + os.path.abspath(my_file) + '"'
+    image_format = '-of ' + image_format + ' '
 
     # Prepare arguments list
-    __arg_string = renderer_path + ' ' + img_name + out_dir + res_x + res_y + my_file
+    __arg_string = renderer_path + ' ' + img_name + out_dir + res_x + res_y + image_format + my_file
 
     LOGGER.debug('Running command line render with arguments:\n%s', __arg_string)
 
