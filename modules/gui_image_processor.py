@@ -76,17 +76,8 @@ class ImageFileWatcher(QtCore.QThread):
 
     led_signal = QtCore.pyqtSignal(int, int)
 
-    # Scan interval in seconds
-    interval = 15
-
-    # Unprocessed images timeout
-    unprocessed_imgs_timer = QtCore.QTimer()
-    unprocessed_imgs_timer.setSingleShot(True)
-    unprocessed_imgs_timer.setInterval(240000)
-
-    test_timer = QtCore.QTimer()
-    test_timer.setSingleShot(True)
-    test_timer.setInterval(5000)
+    # Scan interval in milliseconds
+    interval = 15000
 
     # Thread Pool
     # increase thread timeout to 4 mins
@@ -97,7 +88,7 @@ class ImageFileWatcher(QtCore.QThread):
     scene_file_name = _('KeineSzenenDatei')
 
     def __init__(self, parent, output_dir, scene_file, mod_dir, logging_queue):
-        super(ImageFileWatcher, self).__init__(parent=parent)
+        super(ImageFileWatcher, self).__init__()
 
         # Add queue handler to logger
         global LOGGER
@@ -109,8 +100,12 @@ class ImageFileWatcher(QtCore.QThread):
         self.watcher_img_dict = dict()
         self.processed_img_dict = dict()
 
-        self.unprocessed_imgs_timer.timeout.connect(self.unprocessed_imgs_timed_out)
-        self.test_timer.timeout.connect(self.test_target)
+        # Timers
+        self.unprocessed_imgs_timer = None
+        self.watch_timer = None
+
+        # Setup event loop specific timers inside thread event loop
+        self.started.connect(self.initialize_event_loop)
 
         if scene_file:
             self.scene_file_name = Path(scene_file).stem
@@ -169,9 +164,31 @@ class ImageFileWatcher(QtCore.QThread):
     def previous_imgs(self):
         self.__previous_imgs = set()
 
-    def test_target(self):
-        self.test_timer.start(8000)
-        LOGGER.debug('Test timer fired and restarted. Remaining time: %s', self.test_timer.remainingTime())
+    def run(self):
+        self.exec()
+        LOGGER.error('Image File Watcher thread ended.')
+
+    def initialize_event_loop(self):
+        LOGGER.debug('Initializing Image File Watcher event loop.')
+
+        # Timer for file watcher loop
+        self.watch_timer = QtCore.QTimer()
+        self.watch_timer.setSingleShot(False)
+        self.watch_timer.setInterval(self.interval)
+        self.watch_timer.timeout.connect(self.watch)
+        self.watch_timer.start()
+        LOGGER.debug('Watch Timer: %s', self.watch_timer.remainingTime())
+
+        # Unprocessed images timeout
+        self.unprocessed_imgs_timer = QtCore.QTimer()
+        self.unprocessed_imgs_timer.setSingleShot(True)
+        self.unprocessed_imgs_timer.setInterval(240000)
+        self.unprocessed_imgs_timer.timeout.connect(self.unprocessed_imgs_timed_out)
+        LOGGER.debug('Unprocessed Timout Timer: %s', self.unprocessed_imgs_timer.remainingTime())
+
+        LOGGER.info('Image File Watcher thread event loop started.')
+        if self.watch_active:
+            self.initial_directory_index()
 
     def reset(self):
         self.create_psd_requested = False
@@ -192,33 +209,24 @@ class ImageFileWatcher(QtCore.QThread):
         self.watch_active = False
         self.status_signal.emit(_('Ordnerüberwachung eingestellt.'))
 
-    def run(self):
-        LOGGER.info('Image File Watcher starting.')
+    def watch(self):
+        # Red LED on while image detection threads active
+        if self.thread_pool.activeThreadCount() > 0:
+            self.led_signal.emit(0, 1)
+
+        # Process output folder
         if self.watch_active:
-            self.initial_directory_index()
+            self.led_signal.emit(2, 1)
+            self.watch_folder()
+            self.led_signal.emit(2, 2)
 
-        #TODO No event loop!? Timer not fireing
-        while not self.isInterruptionRequested():
-            # Red LED on while image detection threads active
-            if self.thread_pool.activeThreadCount() > 0:
-                self.led_signal.emit(0, 1)
+        # Check if rendering was finished and all images processed
+        if self.create_psd_requested:
+            self.led_signal.emit(2, 1)
+            self.create_psd()
+            self.led_signal.emit(2, 2)
 
-            # Process output folder
-            if self.watch_active:
-                self.led_signal.emit(2, 1)
-                self.watch_folder()
-                self.led_signal.emit(2, 2)
-
-            # Check if rendering was finished and all images processed
-            if self.create_psd_requested:
-                self.led_signal.emit(2, 1)
-                self.create_psd()
-                self.led_signal.emit(2, 2)
-
-            self.sleep(self.interval)
-            self.led_signal.emit(1, 0)
-
-        LOGGER.error('Image File Watcher thread ending.')
+        self.led_signal.emit(1, 0)
 
     def watch_folder(self):
         img_dict = self.index_img_files()
@@ -289,8 +297,9 @@ class ImageFileWatcher(QtCore.QThread):
         if not create_psd:
             # Force PSD creation after timeout
             if not self.unprocessed_imgs_timer.isActive():
-                LOGGER.debug('Starting unprocessed images timeout.')
                 self.unprocessed_imgs_timer.start()
+                LOGGER.debug('Starting unprocessed images timeout timer. Rem: %s',
+                             self.unprocessed_imgs_timer.remainingTime())
 
             LOGGER.debug('Can not create PSD yet. Some indexed images are not yet processed. '
                          'Retrying on next directory index.')
@@ -461,6 +470,7 @@ class ImageFileWatcher(QtCore.QThread):
 
         # Result
         if not image_is_empty:
+            LOGGER.debug('Image containing non-zero pixel data detected: %s', img_file.stem)
             self.status_signal.emit(_('Bilderkennung abgeschlossen für {}. Bildinhalte erkannt.')
                                     .format(img_file.name)
                                      )
@@ -468,6 +478,7 @@ class ImageFileWatcher(QtCore.QThread):
             return
 
         # Image is empty
+        LOGGER.debug('Empty image detected, will try to delete: %s', img_file.stem)
         self.status_signal.emit(_('Bilderkennung abgeschlossen für {}. '
                                   '<i>Keine Bildinhalte erkannt.</i>')
                                 .format(img_file.name)

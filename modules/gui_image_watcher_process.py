@@ -166,11 +166,13 @@ class WatcherApp(QtWidgets.QApplication):
         LOGGER.info('Image Watcher Thread started.')
 
     def stop_image_watcher(self):
-        LOGGER.debug('Stopping Image Watcher Thread.')
+        LOGGER.debug('Stopping Image File Watcher Thread.')
         if self.image_watcher:
             if self.image_watcher.isRunning():
                 self.image_watcher.requestInterruption()
-                self.image_watcher.quit()
+                self.image_watcher.exit()
+                self.image_watcher.wait(msecs=15000)
+                # self.image_watcher.quit()
 
     def signal_receiver(self, msg):
         if msg.startswith('COMMAND'):
