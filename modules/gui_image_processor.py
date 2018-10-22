@@ -68,6 +68,53 @@ def check_file_in_use(img_file: Path):
     return False
 
 
+class FileDirectoryWorker:
+    # Look for files with the following extension
+    image_file_extension = ImgParams.extension
+
+    @classmethod
+    def index_img_files(cls, img_file_dir: Path):
+        img_file_dict = dict()
+
+        try:
+            if not img_file_dir.exists():
+                LOGGER.error('Can not find image output directory. Nothing to index.')
+                return img_file_dict
+        except OSError as e:
+            LOGGER.error('Can not find image output directory. Nothing to index.')
+            LOGGER.error(e)
+            return img_file_dict
+
+        for __img_file in img_file_dir.glob('*' + cls.image_file_extension):
+            # --------------------------------------------
+            # Check file size
+            try:
+                file_size = __img_file.stat().st_size
+                if file_size < 350000:
+                    # Skip small files that are have just been written by the renderer
+                    # 4K empty iff image file should be at least 539 kB
+                    continue
+            except FileNotFoundError or OSError as e:
+                LOGGER.error('Error indexing image: %s', e)
+                # File probably deleted while watching, skip
+                continue
+
+            # Image key
+            img_key = __img_file.stem
+
+            # Create image file dict entry
+            img_file_dict.update({img_key: dict(path=__img_file)})
+
+        return img_file_dict
+
+    @staticmethod
+    def difference(old_dict, new_dict):
+        current_files = set(old_dict)
+        new_files = set(new_dict)
+
+        return new_files.difference(current_files)
+
+
 class ImageFileWatcher(QtCore.QThread):
     file_created_signal = QtCore.pyqtSignal(set, int)
     file_removed_signal = QtCore.pyqtSignal(set)
@@ -100,6 +147,9 @@ class ImageFileWatcher(QtCore.QThread):
 
         self.watcher_img_dict = dict()
         self.processed_img_dict = dict()
+
+        # File directory index worker
+        self.directory = FileDirectoryWorker()
 
         # Timers
         self.unprocessed_imgs_timer = None
@@ -238,10 +288,9 @@ class ImageFileWatcher(QtCore.QThread):
         self.watch_timer.start()
 
     def watch_folder(self):
-        img_dict = self.index_img_files()
+        img_dict = self.directory.index_img_files(self.output_dir)
         self.report_changes(img_dict)
 
-        # Lock watcher img dict access
         self.watcher_img_dict = img_dict
 
     def initial_directory_index(self):
@@ -249,7 +298,7 @@ class ImageFileWatcher(QtCore.QThread):
         self.reset()
 
         # Index existing files on initial watch
-        self.watcher_img_dict = self.index_img_files()
+        self.watcher_img_dict = self.directory.index_img_files(self.output_dir)
 
         LOGGER.info('Image File Watcher directory changed. Found %s already existing files.',
                     len(self.watcher_img_dict))
@@ -335,6 +384,8 @@ class ImageFileWatcher(QtCore.QThread):
             self.force_psd_creation = False
 
     def psd_created(self, psd_file):
+        self.unprocessed_imgs_timer.stop()
+
         LOGGER.info('PSD File creation finished.')
         self.status_signal.emit(_('PSD Erstellung abgeschlossen für {}.').format(psd_file))
         self.psd_created_signal.emit()
@@ -363,46 +414,12 @@ class ImageFileWatcher(QtCore.QThread):
         self.scene_file_name = Path(file).stem
         self.status_signal.emit(_('Szenendatei geändert zu: {}').format(self.scene_file_name))
 
-    def index_img_files(self):
-        img_dict = dict()
-
-        try:
-            if not self.output_dir.exists():
-                LOGGER.error('Can not find image output directory. Nothing to index.')
-                return img_dict
-        except OSError as e:
-            LOGGER.error('Can not find image output directory. Nothing to index.')
-            LOGGER.error(e)
-            return img_dict
-
-        for __img_file in self.output_dir.glob('*' + ImgParams.extension):
-            # --------------------------------------------
-            # Check file size
-            try:
-                file_size = __img_file.stat().st_size
-                if file_size < 350000:
-                    # Skip small files that are have just been written by the renderer
-                    # 4K empty iff image file should be at least 539 kB
-                    continue
-            except FileNotFoundError or OSError as e:
-                LOGGER.error('Error indexing image: %s', e)
-                # File probably deleted while watching, skip
-                continue
-
-            # Image key
-            img_key = __img_file.stem
-
-            # Create image file dict entry
-            img_dict.update({img_key: dict(path=__img_file)})
-
-        return img_dict
-
     def report_changes(self, current_img_dict):
         self.check_for_created_files(current_img_dict)
         self.check_for_removed_files(current_img_dict)
 
     def check_for_created_files(self, img_dict):
-        new_file_set = self.get_file_difference(old_dict=self.watcher_img_dict, new_dict=img_dict)
+        new_file_set = self.directory.difference(old_dict=self.watcher_img_dict, new_dict=img_dict)
 
         if not new_file_set:
             if not self.create_psd_requested:
@@ -443,6 +460,9 @@ class ImageFileWatcher(QtCore.QThread):
             if img_entry:
                 img_file = img_entry.get('path')
             else:
+                # This happens when new_file_set=self.previous_imgs and the image detection process
+                # already deleted the file and therefore it is not indexed in the freshly acquired img_dict
+                # So skip this entry as it is already processed
                 continue
 
             if img_file:
@@ -488,7 +508,7 @@ class ImageFileWatcher(QtCore.QThread):
         # --- Result ---
         # Image is -not- empty
         if not image_is_empty:
-            LOGGER.debug('Image containing non-zero pixel data detected: %s', img_file.stem)
+            LOGGER.debug('Image containing pixel data detected: %s', img_file.stem)
             self.status_signal.emit(_('Bilderkennung abgeschlossen für {}. Bildinhalte erkannt.')
                                     .format(img_file.name)
                                      )
@@ -512,7 +532,7 @@ class ImageFileWatcher(QtCore.QThread):
             self.image_processing_result(img_file)
 
     def check_for_removed_files(self, img_dict):
-        rem_file_set = self.get_file_difference(old_dict=img_dict, new_dict=self.watcher_img_dict)
+        rem_file_set = self.directory.difference(old_dict=img_dict, new_dict=self.watcher_img_dict)
 
         if not rem_file_set:
             return
@@ -533,14 +553,8 @@ class ImageFileWatcher(QtCore.QThread):
         self.led_signal.emit(0, 2)
 
     def thread_status(self, msg):
+        """ Status signals emitted from image processing or psd threads """
         self.status_signal.emit(msg)
-
-    @staticmethod
-    def get_file_difference(old_dict, new_dict):
-        current_files = set(old_dict)
-        new_files = set(new_dict)
-
-        return new_files.difference(current_files)
 
 
 class ProcessImageSignals(QtCore.QObject):
