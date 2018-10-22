@@ -192,6 +192,8 @@ class ImageFileWatcher(QtCore.QThread):
             self.initial_directory_index()
 
     def reset(self):
+        self.unprocessed_imgs_timer.stop()
+
         self.create_psd_requested = False
 
         # Clear queue of QRunnables thar are not started yet
@@ -316,6 +318,7 @@ class ImageFileWatcher(QtCore.QThread):
 
         # Create psd if every image file is processed OR if force PSD creation requested
         if create_psd or self.force_psd_creation:
+            self.unprocessed_imgs_timer.stop()
             self.status_signal.emit(_('PSD wird erstellt.'))
 
             psd_file_name = self.scene_file_name + _('_Pfade.psd')
