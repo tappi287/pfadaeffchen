@@ -439,8 +439,11 @@ class ImageFileWatcher(QtCore.QThread):
         """ check_for_created_files helper """
         for img_key in new_file_set:
             img_entry = img_dict.get(img_key)
+
             if img_entry:
                 img_file = img_entry.get('path')
+            else:
+                continue
 
             if img_file:
                 self.add_image_processing_thread(img_file)
