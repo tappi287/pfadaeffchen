@@ -434,6 +434,7 @@ class ControlApp(QtCore.QObject, LedControl):
                 self.current_job.render_dir,    # Arg Render path
                 self.mod_dir,                   # Arg Env / module directory
                 self.current_job.ignore_hidden_objects,   # Arg CSB Import option ignoreHiddenObject
+                self.current_job.maya_delete_hidden,      # Arg Maya Layer Creation option
                 self.ui.comboBox_version.currentText(),   # Arg Maya Version
                 self.ui.comboBox_renderer.currentText(),  # Arg Maya renderer
                 self.watcher_create_psd,        # Successfully finished Callback

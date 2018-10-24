@@ -33,7 +33,9 @@ class Job(object):
     combo_box_items = [_('Zum Anfang der Warteschlange'), _('Ans Ende der Warteschlange'), _('Abbrechen')]
     button_txt = _('Ausführen')
 
-    def __init__(self, job_title, scene_file, render_dir, renderer, ignore_hidden_objects='1', client='Server'):
+    def __init__(self, job_title, scene_file, render_dir, renderer,
+                 ignore_hidden_objects='1', maya_delete_hidden='1',
+                 client='Server'):
         self.title = job_title
         self.file = scene_file
         self.render_dir = render_dir
@@ -41,6 +43,9 @@ class Job(object):
 
         # CSB Import option ignoreHiddenObject
         self.ignore_hidden_objects = ignore_hidden_objects
+
+        # Maya Layer Creation process optional argument
+        self.maya_delete_hidden = maya_delete_hidden
 
         # Class version
         self.version = 1

@@ -175,10 +175,11 @@ class MayaMatteLayer(object):
         return __ovr
 
 
-def create():
+def create(maya_delete_hidden=1):
     # Delete all hidden objects
     try:
-        maya_delete.hidden_objects()
+        if maya_delete_hidden:
+            maya_delete.hidden_objects()
     except Exception as e:
         LOGGER.error(e)
 

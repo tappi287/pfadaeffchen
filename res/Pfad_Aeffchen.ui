@@ -15,7 +15,7 @@
   </property>
   <property name="windowIcon">
    <iconset>
-    <normaloff>monkey.png</normaloff>monkey.png</iconset>
+    <normaloff>C:/Users/Stefan/Nextcloud/py/maya_scripts/pfadaeffchen/res/monkey.png</normaloff>C:/Users/Stefan/Nextcloud/py/maya_scripts/pfadaeffchen/res/monkey.png</iconset>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="centralLayout">
@@ -64,7 +64,7 @@
           <x>0</x>
           <y>0</y>
           <width>1029</width>
-          <height>146</height>
+          <height>195</height>
          </rect>
         </property>
         <attribute name="label">
@@ -109,7 +109,7 @@
         <property name="geometry">
          <rect>
           <x>0</x>
-          <y>-78</y>
+          <y>0</y>
           <width>1003</width>
           <height>224</height>
          </rect>
@@ -249,6 +249,22 @@
             </widget>
            </item>
            <item>
+            <widget class="QCheckBox" name="checkBoxMayaDeleteHidden">
+             <property name="font">
+              <font>
+               <weight>50</weight>
+               <bold>false</bold>
+              </font>
+             </property>
+             <property name="text">
+              <string>Maya delete hidden objects</string>
+             </property>
+             <property name="checked">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+           <item>
             <spacer name="horizontalSpacer_2">
              <property name="orientation">
               <enum>Qt::Horizontal</enum>
@@ -278,7 +294,7 @@
           <x>0</x>
           <y>0</y>
           <width>1029</width>
-          <height>146</height>
+          <height>195</height>
          </rect>
         </property>
         <attribute name="label">
@@ -566,8 +582,8 @@
         </property>
         <property name="icon">
          <iconset>
-          <normaloff>checkmark.png</normaloff>
-          <normalon>close.png</normalon>checkmark.png</iconset>
+          <normaloff>C:/Users/Stefan/Nextcloud/py/maya_scripts/pfadaeffchen/res/checkmark.png</normaloff>
+          <normalon>C:/Users/Stefan/Nextcloud/py/maya_scripts/pfadaeffchen/res/close.png</normalon>C:/Users/Stefan/Nextcloud/py/maya_scripts/pfadaeffchen/res/checkmark.png</iconset>
         </property>
         <property name="checkable">
          <bool>true</bool>

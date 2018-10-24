@@ -48,6 +48,7 @@ parser.add_argument('env', help='Space separated, quoted Paths to extend the may
 parser.add_argument('version', help='String value 2016.5 or 2017', type=str)
 parser.add_argument('renderer', help='String value eg. mayaHardware2', type=str)
 parser.add_argument('csb_ignore_hidden', help='Boolean as integer 1 or 0', type=int)
+parser.add_argument('maya_delete_hidden', help='Boolean as integer 1 or 0', type=int)
 
 # Parse command line arguments
 args = parser.parse_args()
@@ -118,7 +119,7 @@ def main():
     # Setup scene with foreground matte layers per material
     send_message('Erstelle render layer setup.')
     send_message('COMMAND STATUS_NAME Erstelle Render-Layer Setup')
-    num_layers = maya_matte_layers.create()
+    num_layers = maya_matte_layers.create(maya_delete_hidden=args.maya_delete_hidden)
     send_message('{:04d} Layer erstellt.'.format(num_layers))
     send_message('COMMAND LAYER_NUM {:04d}'.format(num_layers))
 

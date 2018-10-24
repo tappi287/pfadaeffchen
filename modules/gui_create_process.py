@@ -58,7 +58,8 @@ class RunLayerCreationProcess(threading.Thread):
                  # Logging instance
                  logging_queue,
                  # Process Arguments
-                 scene_file, render_path, module_dir=None, ignore_hidden='1', version=None, use_renderer='',
+                 scene_file, render_path, module_dir=None, ignore_hidden='1', delete_hidden='1',
+                 version=None, use_renderer='',
                  # Callbacks
                  callback=None, failed_callback=None, status_callback=None):
         super(RunLayerCreationProcess, self).__init__()
@@ -68,6 +69,7 @@ class RunLayerCreationProcess(threading.Thread):
         self.scene_file, self.render_path = scene_file, render_path
         self.module_dir, self.version = module_dir, version
         self.use_renderer, self.ignoreHidden = use_renderer, ignore_hidden
+        self.delete_hidden = delete_hidden
 
         # Prepare signals
         self.signals = RunLayerCreationSignals()
@@ -138,17 +140,18 @@ class RunLayerCreationProcess(threading.Thread):
         module_file = os.path.join(self.module_dir, 'maya_mod/run_create_matte_layers.py')
         module_file = os.path.abspath(module_file)
 
-        LOGGER.info('Starting maya standalone with: %s\n%s, %s, %s, %s, %s, %s, pipe_output=%s',
+        LOGGER.info('Starting maya standalone with: %s\n%s, %s, %s, %s, %s, %s, %s, pipe_output=%s',
                     os.path.basename(module_file),
                     self.scene_file, self.render_path, self.module_dir,
-                    self.version, self.use_renderer, self.ignoreHidden, True)
+                    self.version, self.use_renderer, self.ignoreHidden, self.delete_hidden, True)
 
         # Start process
         try:
             self.process = run_module_in_standalone(
                 module_file,
                 # Additional arguments for run_create_matte_layers.py:
-                self.scene_file, self.render_path, self.module_dir, self.version, self.use_renderer, self.ignoreHidden,
+                self.scene_file, self.render_path, self.module_dir, self.version, self.use_renderer,
+                self.ignoreHidden, self.delete_hidden,
                 pipe_output=True,     # Return a process that has output set to PIPE
                 version=self.version  # mayapy version to use
                 )

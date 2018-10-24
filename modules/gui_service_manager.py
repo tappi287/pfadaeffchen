@@ -130,7 +130,7 @@ class ServiceManager(QThread):
         # Setup queue validation
         self.validate_queue_timer = QTimer()
         self.validate_queue_timer.setTimerType(Qt.VeryCoarseTimer)
-        self.validate_queue_timer.setInterval(600000)
+        self.validate_queue_timer.setInterval(30000)
         self.validate_queue_timer.timeout.connect(self.validate_queue)
         self.validate_queue_timer.start()
 
@@ -167,9 +167,17 @@ class ServiceManager(QThread):
     def validate_queue(self):
         """ Test if job items have expired """
         for job in self.job_queue:
+            if job.status < 4:
+                # Skip unfinished or queued jobs
+                continue
+
             created = datetime.fromtimestamp(job.created)
-            if (datetime.now() - created) > timedelta(hours=24):
+            if (datetime.now() - created) > timedelta(minutes=2):
                 self.job_queue.remove(job)
+
+        # Update Remote Index
+        for idx, job in enumerate(self.job_queue):
+            job.remote_index = idx
 
     def prepare_queue_transfer(self, queue):
         """ Transfer the job queue to the client as serialized json dictonary """
@@ -197,6 +205,10 @@ class ServiceManager(QThread):
         job_dict = dict()
 
         for idx, job in enumerate(queue):
+            # Update Remote Index
+            job.remote_index = idx
+
+            # Update Job object
             job_dict.update(
                 {idx: job.__dict__}
                 )
@@ -380,7 +392,7 @@ class ServiceManager(QThread):
         else:
             LOGGER.info('Service manager received: %s', msg)
 
-        response = 'Unknown command'
+        response = 'Unknown command or Job you referred to is no longer in the queue.'
 
         # ----------- CLIENT CONNECTED ------------
         if msg.startswith('GREETING'):
@@ -478,8 +490,8 @@ class ServiceManager(QThread):
                 if job is self.current_job:
                     response = _('PSD Erstellung fuer Job {} wird erzwungen.').format(job.title)
                     self.force_psd_creation_signal.emit()
-            else:
-                response = _('Kann PSD Erstellung fuer Job {} nicht erzwingen.').format(job.title)
+                else:
+                    response = _('Kann PSD Erstellung fuer Job {} nicht erzwingen.').format(job.title)
 
         if tcp_handler:
             self.tcp_respond_signal.connect(tcp_handler.respond)
