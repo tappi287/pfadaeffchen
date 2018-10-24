@@ -130,7 +130,7 @@ class ServiceManager(QThread):
         # Setup queue validation
         self.validate_queue_timer = QTimer()
         self.validate_queue_timer.setTimerType(Qt.VeryCoarseTimer)
-        self.validate_queue_timer.setInterval(30000)
+        self.validate_queue_timer.setInterval(300000)
         self.validate_queue_timer.timeout.connect(self.validate_queue)
         self.validate_queue_timer.start()
 
@@ -172,7 +172,7 @@ class ServiceManager(QThread):
                 continue
 
             created = datetime.fromtimestamp(job.created)
-            if (datetime.now() - created) > timedelta(minutes=2):
+            if (datetime.now() - created) > timedelta(hours=24):
                 self.job_queue.remove(job)
 
         # Update Remote Index
