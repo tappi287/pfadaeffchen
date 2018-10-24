@@ -26,6 +26,7 @@
 """
 import maya.api.OpenMaya as Om
 import pymel.core as pm
+from maya import cmds as cmds
 import re
 from modules.setup_log import setup_logging
 
@@ -59,7 +60,8 @@ def delete(dag_path_array):
         objects_to_delete.append(dag_path.fullPathName())
 
     try:
-        pm.delete(objects_to_delete)
+        # cmds.delete(objects_to_delete)
+        pm.delete(objects_to_delete, inputConnectionsAndNodes=False)
     except Exception as e:
         LOGGER.error(e)
 
@@ -73,20 +75,23 @@ def hidden_objects():
     search = '.*?({})'
 
     for dag_path in dag_path_iterator(traversal_type=Om.MItDag.kDepthFirst):
-        full_path = dag_path.fullPathName()
+        if dag_path.hasFn(Om.MFn.kCamera) or dag_path.isInstanced() or dag_path.isVisible():
+            # Skip cameras, instances, visible objects
+            continue
 
-        if not dag_path.isVisible():
-            m = None
-            # Check if we are inside a child path of an already added path
-            # !IMPORTANT! works only with iterator set to depthFirst
-            if last_hidden_node:
-                m = re.search(search.format(last_hidden_node), full_path)
+        # Check if we are inside a child path of an already added path
+        # !IMPORTANT! works only with iterator set to depthFirst
+        if last_hidden_node:
+            # Returns a match object if we are inside an already known path
+            if re.search(search.format(last_hidden_node), dag_path.fullPathName()):
+                # Skip paths we already know of
+                continue
 
-            # Do not add cameras, instances or childs of already hidden objects
-            if not dag_path.hasFn(Om.MFn.kCamera) and not dag_path.isInstanced() and not m:
-                hidden_paths.append(dag_path)
-                # Unique path to this hidden node(in allmighty unicode encoded as utf-8)
-                last_hidden_node = unicode(dag_path.partialPathName()).encode('utf-8')
+        # Unique path to this hidden node(in allmighty unicode encoded as utf-8)
+        last_hidden_node = unicode(dag_path.partialPathName()).encode('utf-8')
+
+        LOGGER.debug('Deleting hidden scene objects: %s', dag_path.fullPathName())
+        hidden_paths.append(dag_path)
 
     if hidden_paths:
         delete(hidden_paths)

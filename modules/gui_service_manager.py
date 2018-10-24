@@ -223,8 +223,7 @@ class ServiceManager(QThread):
             return
 
         if not self.job_active:
-            self.current_job = self.job_working_queue[0]
-            self.job_working_queue.remove(self.current_job)
+            self.current_job = self.job_working_queue.pop(0)
 
             self.current_job.render_dir = create_unique_render_path(self.current_job.file, self.current_job.render_dir)
 
@@ -414,10 +413,11 @@ class ServiceManager(QThread):
         # ----------- ADD REMOTE JOB ------------
         elif msg.startswith('ADD_JOB'):
             job_string_data = msg[len('ADD_JOB '):]
+            msg_job_idx = len(self.job_queue)
             result = self.add_job(job_string_data, client_name)
 
             if result:
-                response = _('Job #{0:02d} eingereiht in laufende Jobs.').format(len(self.job_working_queue))
+                response = _('Job #{0:02d} eingereiht in laufende Jobs.').format(msg_job_idx)
             else:
                 response = _('<b>Job abgelehnt! </b><span style="color:red;">'
                              'Die Szenendatei oder das Ausgabeverzeichnis sind für den Server nicht verfügbar!</span>')
