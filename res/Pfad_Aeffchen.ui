@@ -63,8 +63,8 @@
          <rect>
           <x>0</x>
           <y>0</y>
-          <width>1029</width>
-          <height>195</height>
+          <width>866</width>
+          <height>146</height>
          </rect>
         </property>
         <attribute name="label">
@@ -293,8 +293,8 @@
          <rect>
           <x>0</x>
           <y>0</y>
-          <width>1029</width>
-          <height>195</height>
+          <width>780</width>
+          <height>121</height>
          </rect>
         </property>
         <attribute name="label">
@@ -582,8 +582,8 @@
         </property>
         <property name="icon">
          <iconset>
-          <normaloff>../../../../Stefan/Nextcloud/py/maya_scripts/pfadaeffchen/res/checkmark.png</normaloff>
-          <normalon>../../../../Stefan/Nextcloud/py/maya_scripts/pfadaeffchen/res/close.png</normalon>../../../../Stefan/Nextcloud/py/maya_scripts/pfadaeffchen/res/checkmark.png</iconset>
+          <normaloff>checkmark.png</normaloff>
+          <normalon>close.png</normalon>checkmark.png</iconset>
         </property>
         <property name="checkable">
          <bool>true</bool>
