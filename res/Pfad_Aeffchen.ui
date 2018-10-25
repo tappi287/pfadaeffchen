@@ -15,7 +15,7 @@
   </property>
   <property name="windowIcon">
    <iconset>
-    <normaloff>C:/Users/Stefan/Nextcloud/py/maya_scripts/pfadaeffchen/res/monkey.png</normaloff>C:/Users/Stefan/Nextcloud/py/maya_scripts/pfadaeffchen/res/monkey.png</iconset>
+    <normaloff>monkey.png</normaloff>monkey.png</iconset>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="centralLayout">
@@ -582,8 +582,8 @@
         </property>
         <property name="icon">
          <iconset>
-          <normaloff>C:/Users/Stefan/Nextcloud/py/maya_scripts/pfadaeffchen/res/checkmark.png</normaloff>
-          <normalon>C:/Users/Stefan/Nextcloud/py/maya_scripts/pfadaeffchen/res/close.png</normalon>C:/Users/Stefan/Nextcloud/py/maya_scripts/pfadaeffchen/res/checkmark.png</iconset>
+          <normaloff>../../../../Stefan/Nextcloud/py/maya_scripts/pfadaeffchen/res/checkmark.png</normaloff>
+          <normalon>../../../../Stefan/Nextcloud/py/maya_scripts/pfadaeffchen/res/close.png</normalon>../../../../Stefan/Nextcloud/py/maya_scripts/pfadaeffchen/res/checkmark.png</iconset>
         </property>
         <property name="checkable">
          <bool>true</bool>
