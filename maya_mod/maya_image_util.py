@@ -26,6 +26,7 @@
     SOFTWARE.
 """
 import os
+import re
 import glob
 from time import time, sleep
 import threading
@@ -226,13 +227,10 @@ class MayaImgUtils(object):
 
         __psd_layer = list()
         for __img_file in cls.iter_image_files(img_path, img_ext):
-            __file_name = os.path.split(__img_file)[-1][:-4]
-            __layer_name = __file_name
+            # Remove unwanted prefixes
+            __layer_name = mladenka_renamer(os.path.split(__img_file)[-1][:-4])
 
-            # Remove targetlook prefix
-            if __layer_name.startswith('t_'):
-                __layer_name = __layer_name[2:]
-
+            # Add psd layer tuple
             __psd_layer.append((__layer_name, 'Normal', __img_file))
 
         if __psd_layer:
@@ -253,3 +251,30 @@ class MayaImgUtils(object):
             return True
 
         return False
+
+
+def mladenka_renamer(name):
+    # Replace target looks t_
+    # eg. t_name -> name
+    try:
+        name = re.sub(r"^t_", '', name)
+    except Exception as e:
+        LOGGER.error(e)
+
+    # Remove layer number and _pfad
+    # eg. int_name_123_pfad -> int_name
+    try:
+        pattern = r'(_+)(\d\d\d)(_+)(.*)'
+        name = re.sub(pattern, r'', name)
+    except Exception as e:
+        LOGGER.error(e)
+
+    # Move int_ etc to end
+    # eg. int_name -> name_int
+    try:
+        pattern = r'(^int|ext|miko|tuer|itafel+)(_+)(.*)'
+        name = re.sub(pattern, r'\3\2\1', name)
+    except Exception as e:
+        LOGGER.error(e)
+
+    return name
