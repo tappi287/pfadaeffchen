@@ -87,6 +87,12 @@ def setup_hw2():
     cmds.setAttr('hardwareRenderingGlobals.multiSampleCount', 16)
 
 
+def setup_mtoa():
+    mu.unlock_renderer('arnold')
+    mel.eval('loadPreferredRenderGlobalsPreset("arnold");')
+    mel.eval('mayaHasRenderSetup;')
+
+
 def setup_render_settings(render_camera='Camera', img_path='', env='.', renderer=''):
     """ Setup the renderer and render settings """
 
@@ -95,6 +101,10 @@ def setup_render_settings(render_camera='Camera', img_path='', env='.', renderer
         settings_path = os.path.join(env, 'res/renderSettings_sw.json')
 
         setup_sw()
+    elif renderer == 'arnold':
+        # Setup arnold renderer
+        settings_path = os.path.join(env, 'res/renderSettings_mtoa.json')
+        setup_mtoa()
     else:
         # Setup mayaHardware2 renderer
         settings_path = os.path.join(env, 'res/renderSettings.json')

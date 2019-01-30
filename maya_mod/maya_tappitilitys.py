@@ -48,6 +48,21 @@ with open(settings_dir, 'r') as f:
     mt_settings = json.load(f, encoding="utf-8")
 
 
+def load_mtoa_plugin():
+    """ Try to load the arnold renderer plugin """
+    arnold_plugin = 'mtoa'
+    loaded_plugins = cmds.pluginInfo(listPlugins=True, q=True)
+
+    if arnold_plugin not in loaded_plugins:
+        try:
+            loaded_plugins = cmds.loadPlugin(arnold_plugin)
+        except Exception as e:
+            LOGGER.error(e)
+        if arnold_plugin not in loaded_plugins:
+            return False
+    return True
+
+
 def load_csb_plugin(version, csb_plugin_loaded=None):
     """ Make sure we can import csb """
 

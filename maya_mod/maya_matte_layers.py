@@ -29,6 +29,7 @@ import maya.api.OpenMaya as Om
 import maya.app.renderSetup.model.renderSetup as renderSetup
 from maya.app.renderSetup.model import typeIDs
 
+from .mrShadersToArnold import convertAllShaders
 from . import maya_tappitilitys
 from . import maya_render_settings
 from . import maya_delete
@@ -175,17 +176,11 @@ class MayaMatteLayer(object):
         return __ovr
 
 
-def create(maya_delete_hidden=1):
+def create(maya_delete_hidden=1, renderer='mayaSoftware'):
     # Delete all hidden objects
     try:
         if maya_delete_hidden:
             maya_delete.hidden_objects()
-    except Exception as e:
-        LOGGER.error(e)
-
-    # Delete all lights
-    try:
-        maya_delete.all_lights()
     except Exception as e:
         LOGGER.error(e)
 
@@ -194,6 +189,18 @@ def create(maya_delete_hidden=1):
         maya_delete.empty_groups()
     except Exception as e:
         LOGGER.error(e)
+
+    # Delete all lights
+    if not renderer == 'arnold':
+        try:
+            maya_delete.all_lights()
+        except Exception as e:
+            LOGGER.error(e)
+    else:
+        # Arnold Setup
+        # Convert materials to AI Standard Shader
+        convertAllShaders()
+        pass
 
     # Create RenderSetup instance
     rs = renderSetup.instance()

@@ -52,6 +52,7 @@ _ = de.gettext
 #TODO: Exception hook for main and image watcher process
 #TODO: log image processor to Job log
 
+
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, app_class, mod_dir, version):
         super(MainWindow, self).__init__()

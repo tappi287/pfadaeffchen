@@ -52,7 +52,7 @@ DESC_EN_STR = "This batch process creates render layer with a foreground matte f
               "is almost identical to DeltaGen" \
 
 DEFAULT_VERSION = '2017'
-AVAILABLE_RENDERER = ['mayaSoftware', 'mayaHardware2']
+AVAILABLE_RENDERER = ['mayaSoftware', 'mayaHardware2', 'arnold']
 COMPATIBLE_VERSIONS = ['2017', '2016.5']
 
 OUTPUT_DIR_NAME = 'render_output'

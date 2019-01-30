@@ -63,7 +63,7 @@ if args.env:
 import pymel.core as pm
 import maya_mod.maya_matte_layers as maya_matte_layers
 import maya_mod.maya_render_settings as maya_render_settings
-from maya_mod.maya_tappitilitys import MayaFileUtils as mfu, load_csb_plugin, MayaUtils as mu
+from maya_mod.maya_tappitilitys import MayaFileUtils as mfu, load_csb_plugin, load_mtoa_plugin, MayaUtils as mu
 from modules.setup_log import setup_logging
 from maya_mod.socket_client import send_message
 
@@ -92,10 +92,18 @@ def main():
         except Exception as e:
             LOGGER.error(e)
 
+    # --- Prepare CSB import
     if scene_ext.capitalize() == '.csb':
         if not load_csb_plugin(args.version):
             LOGGER.fatal('Could not load rttDirectMayaPlugIn. Can not import CSB files. Aborting batch process.')
             send_message('Konnte rttDirectMayaPlugIn nicht laden. Vorgang abgebrochen.')
+            return
+
+    # --- Prepare Arnold Renderer PlugIn
+    if args.renderer == 'arnold':
+        if not load_mtoa_plugin():
+            LOGGER.fatal('Could not load mtoa. Can not render using arnold. Aborting batch process.')
+            send_message('Konnte Arnold Renderer nicht laden. Vorgang abgebrochen.')
             return
 
     # Open or import file
@@ -119,7 +127,8 @@ def main():
     # Setup scene with foreground matte layers per material
     send_message('Erstelle render layer setup.')
     send_message('COMMAND STATUS_NAME Erstelle Render-Layer Setup')
-    num_layers = maya_matte_layers.create(maya_delete_hidden=args.maya_delete_hidden)
+    num_layers = maya_matte_layers.create(maya_delete_hidden=args.maya_delete_hidden,
+                                          renderer=args.renderer)
     send_message('{:04d} Layer erstellt.'.format(num_layers))
     send_message('COMMAND LAYER_NUM {:04d}'.format(num_layers))
 
