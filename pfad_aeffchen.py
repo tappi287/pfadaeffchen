@@ -51,7 +51,10 @@ _ = de.gettext
 
 #TODO: Exception hook for main and image watcher process
 #TODO: log image processor to Job log
-
+#TODO:  Reduce psd layer count, compare target_look values with look values
+#       create a dict of mappings target_look = source_look
+#       then merge either renderlayers or images
+#       less renderlayer would also greatly reduce render time
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, app_class, mod_dir, version):
