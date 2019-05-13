@@ -48,6 +48,13 @@ import os
 import subprocess as sp
 from modules.setup_paths import get_mayapy_path
 
+ABOVE_NORMAL_PRIORITY_CLASS = 0x00008000
+BELOW_NORMAL_PRIORITY_CLASS = 0x00004000
+HIGH_PRIORITY_CLASS = 0x00000080
+IDLE_PRIORITY_CLASS = 0x00000040
+NORMAL_PRIORITY_CLASS = 0x00000020
+REALTIME_PRIORITY_CLASS = 0x00000100
+
 
 def run_command_line_render(my_file, out_dir, res_x, res_y, version, logger, image_format: str='iff'):
     global LOGGER
@@ -74,6 +81,7 @@ def run_command_line_render(my_file, out_dir, res_x, res_y, version, logger, ima
     if 'MAYA_PLUG_IN_PATH' in my_env.keys():
         LOGGER.info('Creating environment without MAYA_PLUG_IN_PATH to fix mayaHardware2 not rendering issue.')
         my_env.pop('MAYA_PLUG_IN_PATH')
-    process = sp.Popen(__arg_string, env=my_env, stdout=sp.PIPE, stderr=sp.STDOUT)
+    process = sp.Popen(__arg_string, env=my_env, stdout=sp.PIPE, stderr=sp.STDOUT,
+                       creationflags=IDLE_PRIORITY_CLASS)
 
     return process

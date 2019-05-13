@@ -16,6 +16,9 @@ class DecyrptoMatte:
         https://github.com/Psyop/Cryptomatte
         https://github.com/Psyop/CryptomatteArnold
     """
+    empty_pixel_threshold = 8  # Minimum number of opaque pixels a matte must contain
+    empty_value_threshold = 0.04
+
     def __init__(self, logger, img_file: Path):
         global LOGGER
         LOGGER = logger
@@ -154,16 +157,21 @@ class DecyrptoMatte:
 
         img_nested_md = self.sorted_crypto_metadata()
 
+        # Prepare template dictionary we can copy from
+        template_cov_pixel = {id_val: 0.0 for id_val in target_ids}
+        template_row_values = {id_val: list() for id_val in target_ids}
+
         # Create dictionary that will store the
         # coverage matte per id
         id_mattes = {id_val: list() for id_val in target_ids}
+        self.img.read()
 
         for y in range(0, self.img.spec().height):
-            matte_coverage_row_values = {id_val: list() for id_val in target_ids}
+            matte_coverage_row_values = template_row_values.copy()
 
             for x in range(0, self.img.spec().width):
                 result_pixel = self.img.getpixel(x, y)
-                coverage_pixels = {id_val: 0.0 for id_val in target_ids}
+                coverage_pixels = template_cov_pixel.copy()
 
                 for cryp_key in img_nested_md:
                     result_id_cov = self.get_id_coverage_dict(
@@ -184,11 +192,21 @@ class DecyrptoMatte:
             for id_val in target_ids:
                 id_mattes[id_val].append(matte_coverage_row_values[id_val])
 
-        # Convert result to numpy array
+            LOGGER.debug('Iterating pixel row: %s %s', x, y)
+
+        # --- Convert result to numpy array ---
+        # Skip mattes below threshold
         for id_val in target_ids:
+            np_matte = np.array(id_mattes[id_val])
+
+            if np_matte.any(axis=-1).sum() < self.empty_pixel_threshold or np_matte.sum() < self.empty_value_threshold:
+                LOGGER.debug('Removing matte below empty threshold: %s', id_val)
+                id_mattes.pop(id_val)
+                continue
+
             id_mattes[id_val] = np.array(id_mattes[id_val])
 
-        # DEBUG info
+        # --- DEBUG info ---
         LOGGER.debug(f'Iterated image : {self.img.spec().width:04d}x{self.img.spec().height:04d} - '
                      f'for {len(target_ids)} ids.')
         for matte in id_mattes.values():
