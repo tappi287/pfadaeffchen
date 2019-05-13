@@ -78,6 +78,7 @@ class SocketAddress:
 # Default image parameters
 class ImgParams:
     extension = 'sgi'
+    extension_arnold = 'exr'
     res_x = 3840
     res_y = 2160
     maya_detection_format = 'iff'

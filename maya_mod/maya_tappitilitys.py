@@ -63,6 +63,13 @@ def load_mtoa_plugin():
     return True
 
 
+def create_arnold_default_light():
+    """ Create generic default light for arnold which can not use maya default light """
+    cmds.directionalLight(rotation=(45, 30, 15), intensity=0.7, useRayTraceShadows=0)
+    cmds.directionalLight(rotation=(240, 45, 45), intensity=0.7, useRayTraceShadows=0)
+    cmds.directionalLight(rotation=(-62, 55, 0), intensity=1.0, useRayTraceShadows=1)
+
+
 def load_csb_plugin(version, csb_plugin_loaded=None):
     """ Make sure we can import csb """
 

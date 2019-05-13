@@ -181,11 +181,16 @@ class RunLayerCreationProcess(threading.Thread):
             self.render_process_exitcode = -1
             return
 
+        if self.use_renderer == 'arnold':
+            img_ext = ImgParams.extension_arnold
+        else:
+            img_ext = ImgParams.extension
+
         try:
             self.render_process = run_command_line_render(
                 self.render_scene_file, self.render_path, 3840, 2160,
                 self.version, LOGGER,
-                image_format=ImgParams.extension)
+                image_format=img_ext)
             LOGGER.info('Maya batch rendering started.')
         except Exception as e:
             LOGGER.error(e)

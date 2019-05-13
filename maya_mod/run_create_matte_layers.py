@@ -63,7 +63,8 @@ if args.env:
 import pymel.core as pm
 import maya_mod.maya_matte_layers as maya_matte_layers
 import maya_mod.maya_render_settings as maya_render_settings
-from maya_mod.maya_tappitilitys import MayaFileUtils as mfu, load_csb_plugin, load_mtoa_plugin, MayaUtils as mu
+from maya_mod.maya_tappitilitys import MayaFileUtils as mfu, load_csb_plugin, load_mtoa_plugin, MayaUtils as mu, \
+    create_arnold_default_light
 from modules.setup_log import setup_logging
 from maya_mod.socket_client import send_message
 

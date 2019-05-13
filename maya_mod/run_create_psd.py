@@ -37,6 +37,7 @@ parser = argparse.ArgumentParser()
 # Positional argument 1 img_path
 parser.add_argument('psd_file', help='Absolute path to the PSD file that should be created.', type=str)
 parser.add_argument('img_path', help='Absolute path to the directory containing image files.', type=str)
+parser.add_argument('file_ext', help='File extension of image files to look up eg. png', type=str)
 parser.add_argument('env', help='Space separated, quoted Paths to extend the mayapy pythonpaths.', type=str)
 
 # Parse command line arguments
@@ -53,4 +54,4 @@ from maya_mod.maya_image_util import MayaImgUtils
 
 # Create layered PSD file from images and delete single image files
 MayaImgUtils.create_layered_psd(
-    args.psd_file, args.img_path, rem_single_imgs=True)
+    args.psd_file, args.img_path, img_ext=args.file_ext, rem_single_imgs=True)

@@ -27,6 +27,7 @@
 """
 import os
 import json
+from time import sleep
 import maya.app.renderSetup.model.renderSetup as renderSetup
 import maya.app.renderSetup.model.renderSettings as renderSettings
 
@@ -92,6 +93,15 @@ def setup_mtoa():
     mel.eval('loadPreferredRenderGlobalsPreset("arnold");')
     mel.eval('mayaHasRenderSetup;')
 
+    # Load up defaultArnoldRenderOptions
+    # this will also create defaultArnoldDisplayDriver etc. whose are necessary to set up AOVs
+    from mtoa.core import createOptions
+    createOptions()
+
+    # --- Setup Cryptomatte AOV ---
+    import mtoa.aovs as aovs
+    aovs.AOVInterface().addAOV('crypto_material', aovType='rgb', aovShader='cryptomatte')
+
 
 def setup_render_settings(render_camera='Camera', img_path='', env='.', renderer=''):
     """ Setup the renderer and render settings """
@@ -103,7 +113,7 @@ def setup_render_settings(render_camera='Camera', img_path='', env='.', renderer
         setup_sw()
     elif renderer == 'arnold':
         # Setup arnold renderer
-        settings_path = os.path.join(env, 'res/renderSettings_mtoa.json')
+        settings_path = os.path.join(env, 'res/renderSettings_mtoa_crypto.json')
         setup_mtoa()
     else:
         # Setup mayaHardware2 renderer

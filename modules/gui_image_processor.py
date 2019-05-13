@@ -20,6 +20,7 @@
         along with Pfad Aeffchen.  If not, see <http://www.gnu.org/licenses/>.
 """
 import os
+import shutil
 import numpy as np
 from PIL import Image
 from time import sleep, time
@@ -27,6 +28,7 @@ from pathlib import Path
 from PyQt5 import QtCore
 from subprocess import TimeoutExpired
 
+from modules.decryptomatte import DecyrptoMatte, write_image
 from modules.detect_lang import get_translation
 from modules.setup_log import add_queue_handler, setup_logging, setup_queued_logger
 from modules.check_file_access import CheckFileAccess
@@ -34,6 +36,8 @@ from modules.app_globals import *
 from maya_mod.start_mayapy import run_module_in_standalone
 
 # translate strings
+from modules.utils import create_file_safe_name
+
 de = get_translation()
 _ = de.gettext
 
@@ -126,6 +130,8 @@ class ImageFileWatcher(QtCore.QThread):
 
     # Scan interval in milliseconds
     interval = 15000
+    cryptomatte_dir_name = 'crypto_material'
+    cryptomatte_out_file_ext = 'png'
 
     # Thread Pool
     # increase thread timeout to 4 mins
@@ -167,6 +173,7 @@ class ImageFileWatcher(QtCore.QThread):
         # Called when rendering is finished
         self.create_psd_requested = False
         self.force_psd_creation = False
+        self.is_arnold = False
 
         # Prepare thread pool
         self.thread_pool = QtCore.QThreadPool(parent=self)
@@ -245,6 +252,7 @@ class ImageFileWatcher(QtCore.QThread):
         self.unprocessed_imgs_timer.stop()
 
         self.create_psd_requested = False
+        self.is_arnold = False
 
         # Clear queue of QRunnables thar are not started yet
         self.thread_pool.clear()
@@ -288,8 +296,16 @@ class ImageFileWatcher(QtCore.QThread):
         self.watch_timer.start()
 
     def watch_folder(self):
+        if self.is_arnold:
+            return
+
         img_dict = self.directory.index_img_files(self.output_dir)
         self.report_changes(img_dict)
+
+        # Watch for arnold render results
+        if (self.output_dir / self.cryptomatte_dir_name).exists() or (self.output_dir / 'beauty').exists():
+            self.is_arnold = True
+            self.file_created_signal.emit(set(), 1)
 
         self.watcher_img_dict = img_dict
 
@@ -333,6 +349,11 @@ class ImageFileWatcher(QtCore.QThread):
             LOGGER.debug('Can not create PSD yet. Image detection threads active. Retrying on next directory index.')
             return
 
+        if self.is_arnold:
+            self.status_signal.emit(_('Cryptomatten werden erstellt.'))
+            self.file_created_signal.emit(set(), 2)
+            self.watcher_img_dict, self.processed_img_dict = self.create_cryptomattes()
+
         if not len(self.watcher_img_dict):
             # No images to create PSD from, set Job as failed
             LOGGER.error('PSD requested but no images to process. Resetting image watcher.')
@@ -374,8 +395,15 @@ class ImageFileWatcher(QtCore.QThread):
             psd_file = self.output_dir / psd_file_name
 
             LOGGER.debug('Starting PSD Thread: %s %s %s', psd_file, self.output_dir, self.mod_dir)
+
+            if self.is_arnold:
+                file_ext = self.cryptomatte_out_file_ext
+            else:
+                file_ext = ImgParams.extension
+
             create_psd_runner = CreatePSDFile(
-                psd_file, self.output_dir, self.mod_dir, self.thread_status, self.psd_created
+                psd_file, self.output_dir, self.mod_dir, self.thread_status, self.psd_created,
+                file_ext_override=file_ext
                 )
 
             self.thread_pool.start(create_psd_runner)
@@ -387,6 +415,15 @@ class ImageFileWatcher(QtCore.QThread):
         self.unprocessed_imgs_timer.stop()
 
         LOGGER.info('PSD File creation finished.')
+
+        # Remove arnold render results
+        if self.is_arnold:
+            try:
+                shutil.rmtree(Path(self.output_dir / 'beauty').as_posix(), ignore_errors=True)
+                shutil.rmtree(Path(self.output_dir / self.cryptomatte_dir_name).as_posix(), ignore_errors=True)
+            except Exception as e:
+                LOGGER.error('Error removing arnold render results: %s', e)
+
         self.status_signal.emit(_('PSD Erstellung abgeschlossen für {}.').format(psd_file))
         self.psd_created_signal.emit()
         self.led_signal.emit(0, 2)
@@ -531,6 +568,33 @@ class ImageFileWatcher(QtCore.QThread):
             # Set un-removable files as processed
             self.image_processing_result(img_file)
 
+    def create_cryptomattes(self):
+        """ Very first ugly slow implementation """
+        img_file_dict = dict()
+        img_file = [i for i in Path(self.output_dir / self.cryptomatte_dir_name).glob('*.exr') if i.exists()]
+        if img_file:
+            img_file = img_file[0]
+        else:
+            return img_file_dict, img_file_dict
+
+        d = DecyrptoMatte(LOGGER, img_file)
+        layers = d.list_layers()
+        id_mattes = d.get_mattes_by_names(layers)
+
+        for layer_name, id_matte in id_mattes.items():
+            eight_bit_matte = np.uint8(id_matte * 255)
+            rgba_matte = d.grayscale_to_rgba(eight_bit_matte)
+            matte_img_file = self.output_dir / f'{create_file_safe_name(layer_name)}.{self.cryptomatte_out_file_ext}'
+
+            # Create image file dict entry
+            img_file_dict.update({matte_img_file.stem: dict(path=matte_img_file, processed=True)})
+            # Create image
+            write_image(matte_img_file, rgba_matte)
+
+        d.shutdown()
+
+        return img_file_dict, img_file_dict
+
     def check_for_removed_files(self, img_dict):
         rem_file_set = self.directory.difference(old_dict=img_dict, new_dict=self.watcher_img_dict)
 
@@ -643,10 +707,12 @@ class CreatePSDFileSignals(QtCore.QObject):
 
 class CreatePSDFile(QtCore.QRunnable):
 
-    def __init__(self, psd_file, img_dir, mod_dir, status_callback, result_callback):
+    def __init__(self, psd_file, img_dir, mod_dir, status_callback, result_callback, file_ext_override=''):
         super(CreatePSDFile, self).__init__()
         self.psd_file, self.img_dir, self.mod_dir = psd_file, img_dir, mod_dir
         self.psd_creation_module = Path(self.mod_dir) / 'maya_mod/run_create_psd.py'
+
+        self.file_extension = file_ext_override or ImgParams.extension
 
         self.signals = CreatePSDFileSignals()
         self.signals.result.connect(result_callback)
@@ -656,8 +722,9 @@ class CreatePSDFile(QtCore.QRunnable):
         try:
             self.signals.status.emit(_('Erstelle PSD Datei {}').format(self.psd_file.name))
             process = run_module_in_standalone(
-                self.psd_creation_module.as_posix(), self.psd_file.as_posix(), self.img_dir.as_posix(),
-                Path(self.mod_dir).as_posix()
+                self.psd_creation_module.as_posix(),  # Path to module to run
+                self.psd_file.as_posix(), self.img_dir.as_posix(), self.file_extension,  # Args
+                Path(self.mod_dir).as_posix()  # Environment dir
                 )
             process.wait()
         except Exception as e:

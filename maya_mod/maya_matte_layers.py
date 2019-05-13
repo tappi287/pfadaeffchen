@@ -177,6 +177,12 @@ class MayaMatteLayer(object):
 
 
 def create(maya_delete_hidden=1, renderer='mayaSoftware'):
+    if renderer == 'arnold':
+        maya_delete.all_lights()
+        maya_tappitilitys.create_arnold_default_light()
+        """ Skip render layer setup, we will use cryptomatte crypto_material AOV with arnold """
+        return 2
+
     # Delete all hidden objects
     try:
         if maya_delete_hidden:
@@ -191,16 +197,16 @@ def create(maya_delete_hidden=1, renderer='mayaSoftware'):
         LOGGER.error(e)
 
     # Delete all lights
-    if not renderer == 'arnold':
-        try:
-            maya_delete.all_lights()
-        except Exception as e:
-            LOGGER.error(e)
-    else:
-        # Arnold Setup
-        # Convert materials to AI Standard Shader
-        convertAllShaders()
-        pass
+    try:
+        maya_delete.all_lights()
+    except Exception as e:
+        LOGGER.error(e)
+
+    """
+    # Arnold Setup
+    # Convert materials to AI Standard Shader
+    convertAllShaders()
+    """
 
     # Create RenderSetup instance
     rs = renderSetup.instance()

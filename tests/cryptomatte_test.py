@@ -8,7 +8,7 @@ logging.basicConfig(level=logging.DEBUG)
 LOGGER = logging.getLogger(__name__)
 
 def main():
-    img_file = Path(r'H:\tmp\crypto\images\tmp\crypto_material\crypto_Felgen.exr')
+    img_file = Path(r'H:\tmp\crypto_2\images\tmp\crypto_material\test_scene.exr')
     d = DecyrptoMatte(LOGGER, img_file)
     layers = d.list_layers()
     id_mattes = d.get_mattes_by_names(layers)

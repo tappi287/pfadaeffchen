@@ -28,6 +28,12 @@ class DecyrptoMatte:
         self.metadata_cache = {}
         self.manifest_cache = {}
 
+    def shutdown(self):
+        """ Release resources """
+        self.img.reset()
+        self.metadata_cache = {}
+        self.manifest_cache = {}
+
     def list_layers(self):
         """ List available ID layers of this cryptomatte image """
         metadata = self.crypto_metadata()
@@ -154,7 +160,7 @@ class DecyrptoMatte:
 
             for x in range(0, self.img.spec().width):
                 result_pixel = self.img.getpixel(x, y)
-                coverage_pixel = {id_val: 0.0 for id_val in target_ids}
+                coverage_pixels = {id_val: 0.0 for id_val in target_ids}
 
                 for cryp_key in img_nested_md:
                     result_id_cov = self.get_id_coverage_dict(
@@ -163,13 +169,13 @@ class DecyrptoMatte:
                         )
 
                     for id_val, coverage in result_id_cov.items():
-                        if id_val:
+                        if id_val in coverage_pixels:
                             # Sum coverage per id
-                            coverage_pixel[id_val] += coverage
+                            coverage_pixels[id_val] += coverage
 
                 # Update row values
                 for id_val in target_ids:
-                    matte_coverage_row_values[id_val].append(coverage_pixel[id_val])
+                    matte_coverage_row_values[id_val].append(coverage_pixels[id_val])
 
             # Append this image row coverage values
             for id_val in target_ids:

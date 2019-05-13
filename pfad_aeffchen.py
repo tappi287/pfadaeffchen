@@ -56,6 +56,7 @@ _ = de.gettext
 #       then merge either renderlayers or images
 #       less renderlayer would also greatly reduce render time
 
+
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, app_class, mod_dir, version):
         super(MainWindow, self).__init__()
