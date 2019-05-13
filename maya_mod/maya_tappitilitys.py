@@ -361,6 +361,17 @@ class MayaUtils(object):
 
         return name
 
+    @staticmethod
+    def rename_shading_grps_to_ascii():
+        """ Rename shading groups to contain only ASCII characters """
+        import re
+
+        for sg in cmds.ls(type='shadingEngine'):
+            newname = re.sub(r'[^\x00-\x7F]+', '-', sg)
+
+            if newname != sg:
+                cmds.rename(sg, newname)
+
     @classmethod
     def uninstance_scene(cls):
         """ Way too slow for big scenes, do not use """

@@ -599,9 +599,6 @@ class ImageFileWatcher(QtCore.QThread):
             write_image(matte_img_file, rgba_matte)
 
         d.shutdown()
-
-
-
         return img_file_dict, img_file_dict
 
     def check_for_removed_files(self, img_dict):

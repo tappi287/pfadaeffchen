@@ -100,7 +100,10 @@ def setup_mtoa():
 
     # --- Setup Cryptomatte AOV ---
     import mtoa.aovs as aovs
-    aovs.AOVInterface().addAOV('crypto_material', aovType='rgb', aovShader='cryptomatte')
+    try:
+        aovs.AOVInterface().addAOV('crypto_material', aovType='rgb', aovShader='cryptomatte')
+    except Exception as e:
+        LOGGER.error('Error creating cryptomatte AOV: %s', e)
 
 
 def setup_render_settings(render_camera='Camera', img_path='', env='.', renderer=''):
