@@ -16,8 +16,8 @@ class DecyrptoMatte:
         https://github.com/Psyop/Cryptomatte
         https://github.com/Psyop/CryptomatteArnold
     """
-    empty_pixel_threshold = 8  # Minimum number of opaque pixels a matte must contain
-    empty_value_threshold = 0.04
+    empty_pixel_threshold = 5  # Minimum number of opaque pixels a matte must contain
+    empty_value_threshold = 0.2  # Minimum sum of all coverage values of all pixels
 
     def __init__(self, logger, img_file: Path):
         global LOGGER
@@ -34,22 +34,25 @@ class DecyrptoMatte:
     def shutdown(self):
         """ Release resources """
         try:
+            del self.metadata_cache
+            del self.manifest_cache
             self.img.clear()
+            del self.img
         except Exception as e:
             LOGGER.error('Error closing img buf: %s', e)
-        self.metadata_cache = {}
-        self.manifest_cache = {}
+
+    def _create_manifest_cache(self, metadata):
+        if not self.manifest_cache:
+            manifest = [m for k, m in metadata.items() if k.endswith('manifest')]
+            if manifest:
+                self.manifest_cache = json.loads(manifest[0])
 
     def list_layers(self):
         """ List available ID layers of this cryptomatte image """
         metadata = self.crypto_metadata()
         layer_names = list()
 
-        if not self.manifest_cache:
-            manifest = [m for k, m in metadata.items() if k.endswith('manifest')]
-            if manifest:
-                self.manifest_cache = json.loads(manifest[0])
-
+        self._create_manifest_cache(metadata)
         LOGGER.info('Found Cryptomatte with %s id layers', len(self.manifest_cache))
 
         # List ids in cryptomatte
@@ -134,6 +137,9 @@ class DecyrptoMatte:
     def get_mattes_by_names(self, layer_names: List[str]) -> dict:
         id_to_names = dict()
 
+        if not self.manifest_cache:
+            self._create_manifest_cache(self.crypto_metadata())
+
         for name in layer_names:
             if name in self.manifest_cache:
                 id_val = self.hex_str_to_id(self.manifest_cache.get(name))
@@ -156,22 +162,15 @@ class DecyrptoMatte:
             return dict()
 
         img_nested_md = self.sorted_crypto_metadata()
+        result_pixel, result_id_cov = None, None
 
-        # Prepare template dictionary we can copy from
-        template_cov_pixel = {id_val: 0.0 for id_val in target_ids}
-        template_row_values = {id_val: list() for id_val in target_ids}
+        # Create dictionary that will store the coverage matte arrays per id
+        w, h = self.img.spec().width, self.img.spec().height
+        id_mattes = {id_val: np.zeros((h, w), dtype=np.float16) for id_val in target_ids}
 
-        # Create dictionary that will store the
-        # coverage matte per id
-        id_mattes = {id_val: list() for id_val in target_ids}
-        self.img.read()
-
-        for y in range(0, self.img.spec().height):
-            matte_coverage_row_values = template_row_values.copy()
-
-            for x in range(0, self.img.spec().width):
+        for y in range(0, h):
+            for x in range(0, w):
                 result_pixel = self.img.getpixel(x, y)
-                coverage_pixels = template_cov_pixel.copy()
 
                 for cryp_key in img_nested_md:
                     result_id_cov = self.get_id_coverage_dict(
@@ -180,41 +179,25 @@ class DecyrptoMatte:
                         )
 
                     for id_val, coverage in result_id_cov.items():
-                        if id_val in coverage_pixels:
+                        if id_val in id_mattes:
                             # Sum coverage per id
-                            coverage_pixels[id_val] += coverage
+                            id_mattes[id_val][y][x] += coverage
 
-                # Update row values
-                for id_val in target_ids:
-                    matte_coverage_row_values[id_val].append(coverage_pixels[id_val])
+            if not y % 200:
+                LOGGER.debug('Iterating pixel row %s of %s', y, h)
 
-            # Append this image row coverage values
-            for id_val in target_ids:
-                id_mattes[id_val].append(matte_coverage_row_values[id_val])
+        del result_id_cov, result_pixel
 
-            LOGGER.debug('Iterating pixel row: %s %s', x, y)
-
-        # --- Convert result to numpy array ---
-        # Skip mattes below threshold
+        # Purge mattes below threshold value
         for id_val in target_ids:
-            np_matte = np.array(id_mattes[id_val])
+            v, p = id_mattes[id_val].max(), id_mattes[id_val].any(axis=-1).sum()
 
-            if np_matte.any(axis=-1).sum() < self.empty_pixel_threshold or np_matte.sum() < self.empty_value_threshold:
-                LOGGER.debug('Removing matte below empty threshold: %s', id_val)
+            if v < self.empty_value_threshold and p < self.empty_pixel_threshold:
+                LOGGER.debug('Purging empty coverage matte: %s %s', v, p)
                 id_mattes.pop(id_val)
-                continue
-
-            id_mattes[id_val] = np.array(id_mattes[id_val])
 
         # --- DEBUG info ---
-        LOGGER.debug(f'Iterated image : {self.img.spec().width:04d}x{self.img.spec().height:04d} - '
-                     f'for {len(target_ids)} ids.')
-        for matte in id_mattes.values():
-            if matte is not None:
-                break
-        else:
-            matte = np.empty((1, 1))
-        LOGGER.debug(f'Matte dimension: {matte.shape[1]:04d}x{matte.shape[0]:04d}')
+        LOGGER.debug(f'Iterated image : {w:04d}x{h:04d} - with {len(target_ids)} ids.')
 
         return id_mattes
 

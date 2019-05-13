@@ -69,6 +69,12 @@ def create_arnold_default_light():
     cmds.directionalLight(rotation=(240, 45, 45), intensity=0.7, useRayTraceShadows=0)
     cmds.directionalLight(rotation=(-62, 55, 0), intensity=1.0, useRayTraceShadows=1)
 
+    try:
+        import mtoa.utils as mutils
+        mutils.createLocator("aiSkyDomeLight", asLight=True)
+    except Exception as e:
+        LOGGER.error('Error creating arnold Sky Dome Light: %s', e)
+
 
 def load_csb_plugin(version, csb_plugin_loaded=None):
     """ Make sure we can import csb """

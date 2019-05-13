@@ -352,7 +352,9 @@ class ImageFileWatcher(QtCore.QThread):
         if self.is_arnold:
             self.status_signal.emit(_('Cryptomatten werden erstellt.'))
             self.file_created_signal.emit(set(), 3)
-            self.watcher_img_dict, self.processed_img_dict = self.create_cryptomattes()
+
+            c = CreateCryptomattes(self.output_dir)
+            self.watcher_img_dict, self.processed_img_dict = c.create_cryptomattes()
 
         if not len(self.watcher_img_dict):
             # No images to create PSD from, set Job as failed
@@ -568,39 +570,6 @@ class ImageFileWatcher(QtCore.QThread):
             # Set un-removable files as processed
             self.image_processing_result(img_file)
 
-    def create_cryptomattes(self):
-        """ Very first ugly slow implementation """
-        img_file_dict, beauty_img = dict(), None
-        img_file = [i for i in Path(self.output_dir / self.cryptomatte_dir_name).glob('*.exr') if i.exists()]
-        beauty_f = [i for i in Path(self.output_dir / 'beauty').glob('*.exr') if i.exists()]
-
-        # Check that cryptomatte aov exr exists
-        if img_file:
-            img_file = img_file[0]
-        else:
-            return img_file_dict, img_file_dict
-
-        # Use beauty render if available and convert to 8bit
-        if beauty_f:
-            beauty_img = read_image(beauty_f[0], format='uint8')
-
-        d = DecyrptoMatte(LOGGER, img_file)
-        layers = d.list_layers()
-        id_mattes = d.get_mattes_by_names(layers)
-
-        for layer_name, id_matte in id_mattes.items():
-            eight_bit_matte = np.uint8(id_matte * 255)
-            rgba_matte = d.grayscale_to_rgba(eight_bit_matte, beauty_img=beauty_img)
-            matte_img_file = self.output_dir / f'{create_file_safe_name(layer_name)}.{self.cryptomatte_out_file_ext}'
-
-            # Create image file dict entry
-            img_file_dict.update({matte_img_file.stem: dict(path=matte_img_file, processed=True)})
-            # Create image
-            write_image(matte_img_file, rgba_matte)
-
-        d.shutdown()
-        return img_file_dict, img_file_dict
-
     def check_for_removed_files(self, img_dict):
         rem_file_set = self.directory.difference(old_dict=img_dict, new_dict=self.watcher_img_dict)
 
@@ -704,6 +673,51 @@ class ProcessImage(QtCore.QRunnable):
             except Exception as e:
                 LOGGER.error('Killing the Image content detection process failed!')
                 LOGGER.error(e)
+
+
+class CreateCryptomattes:
+    def __init__(self, output_dir: Path):
+        self.output_dir = output_dir
+        self.cryptomatte_dir_name = ImageFileWatcher.cryptomatte_dir_name
+        self.cryptomatte_out_file_ext = ImageFileWatcher.cryptomatte_out_file_ext
+
+    def create_cryptomattes(self):
+        """ Extract cryptomattes to files and return image_file_watcher dict """
+        img_file_dict, beauty_img = dict(), None
+        img_file = [i for i in Path(self.output_dir / self.cryptomatte_dir_name).glob('*.exr') if i.exists()]
+        beauty_f = [i for i in Path(self.output_dir / 'beauty').glob('*.exr') if i.exists()]
+
+        # Check that cryptomatte aov exr exists
+        if img_file:
+            img_file = img_file[0]
+        else:
+            return img_file_dict, img_file_dict
+
+        # Use beauty render if available and convert to 8bit
+        if beauty_f:
+            beauty_img = read_image(beauty_f[0], format='uint8')
+
+        d = DecyrptoMatte(LOGGER, img_file)
+        layers = d.list_layers()
+        id_mattes = d.get_mattes_by_names(layers)
+
+        for layer_name, id_matte in id_mattes.items():
+            rgba_matte = d.grayscale_to_rgba(np.uint8(id_matte * 255), beauty_img=beauty_img)
+            matte_img_file = self.output_dir / f'{create_file_safe_name(layer_name)}.{self.cryptomatte_out_file_ext}'
+
+            # Create image file dict entry
+            img_file_dict.update({matte_img_file.stem: dict(path=matte_img_file, processed=True)})
+            # Create image
+            write_image(matte_img_file, rgba_matte)
+
+        # CleanUp
+        d.shutdown()
+        try:
+            del d
+        except Exception as e:
+            LOGGER.error(e)
+
+        return img_file_dict, img_file_dict
 
 
 class CreatePSDFileSignals(QtCore.QObject):
