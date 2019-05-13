@@ -28,7 +28,7 @@ from pathlib import Path
 from PyQt5 import QtCore
 from subprocess import TimeoutExpired
 
-from modules.decryptomatte import DecyrptoMatte, write_image
+from modules.decryptomatte import DecyrptoMatte, write_image, read_image
 from modules.detect_lang import get_translation
 from modules.setup_log import add_queue_handler, setup_logging, setup_queued_logger
 from modules.check_file_access import CheckFileAccess
@@ -305,7 +305,7 @@ class ImageFileWatcher(QtCore.QThread):
         # Watch for arnold render results
         if (self.output_dir / self.cryptomatte_dir_name).exists() or (self.output_dir / 'beauty').exists():
             self.is_arnold = True
-            self.file_created_signal.emit(set(), 1)
+            self.file_created_signal.emit(set(), 2)
 
         self.watcher_img_dict = img_dict
 
@@ -351,7 +351,7 @@ class ImageFileWatcher(QtCore.QThread):
 
         if self.is_arnold:
             self.status_signal.emit(_('Cryptomatten werden erstellt.'))
-            self.file_created_signal.emit(set(), 2)
+            self.file_created_signal.emit(set(), 3)
             self.watcher_img_dict, self.processed_img_dict = self.create_cryptomattes()
 
         if not len(self.watcher_img_dict):
@@ -570,12 +570,19 @@ class ImageFileWatcher(QtCore.QThread):
 
     def create_cryptomattes(self):
         """ Very first ugly slow implementation """
-        img_file_dict = dict()
+        img_file_dict, beauty_img = dict(), None
         img_file = [i for i in Path(self.output_dir / self.cryptomatte_dir_name).glob('*.exr') if i.exists()]
+        beauty_f = [i for i in Path(self.output_dir / 'beauty').glob('*.exr') if i.exists()]
+
+        # Check that cryptomatte aov exr exists
         if img_file:
             img_file = img_file[0]
         else:
             return img_file_dict, img_file_dict
+
+        # Use beauty render if available and convert to 8bit
+        if beauty_f:
+            beauty_img = read_image(beauty_f[0], format='uint8')
 
         d = DecyrptoMatte(LOGGER, img_file)
         layers = d.list_layers()
@@ -583,7 +590,7 @@ class ImageFileWatcher(QtCore.QThread):
 
         for layer_name, id_matte in id_mattes.items():
             eight_bit_matte = np.uint8(id_matte * 255)
-            rgba_matte = d.grayscale_to_rgba(eight_bit_matte)
+            rgba_matte = d.grayscale_to_rgba(eight_bit_matte, beauty_img=beauty_img)
             matte_img_file = self.output_dir / f'{create_file_safe_name(layer_name)}.{self.cryptomatte_out_file_ext}'
 
             # Create image file dict entry
@@ -592,6 +599,8 @@ class ImageFileWatcher(QtCore.QThread):
             write_image(matte_img_file, rgba_matte)
 
         d.shutdown()
+
+
 
         return img_file_dict, img_file_dict
 

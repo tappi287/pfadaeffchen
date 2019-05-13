@@ -55,7 +55,8 @@ _ = de.gettext
 #       create a dict of mappings target_look = source_look
 #       then merge either renderlayers or images
 #       less renderlayer would also greatly reduce render time
-
+#
+# pipenv 2018.5.18
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, app_class, mod_dir, version):

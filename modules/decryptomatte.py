@@ -30,7 +30,10 @@ class DecyrptoMatte:
 
     def shutdown(self):
         """ Release resources """
-        self.img.reset()
+        try:
+            self.img.clear()
+        except Exception as e:
+            LOGGER.error('Error closing img buf: %s', e)
         self.metadata_cache = {}
         self.manifest_cache = {}
 
@@ -243,12 +246,33 @@ class DecyrptoMatte:
         return cls.id_to_hex_str(cls.mm3hash_float(layer_name))[:-1]
 
     @staticmethod
-    def grayscale_to_rgba(im):
+    def grayscale_to_rgba(im, beauty_img: np.ndarray=None):
         """ Convert single channel(grayscale) numpy array to 4 channel rgba 8bit """
         w, h = im.shape
         ret = np.empty((w, h, 4), dtype=np.uint8)
-        ret[:, :, 3] = ret[:, :, 2] =  ret[:, :, 1] =  ret[:, :, 0] = im
+
+        if beauty_img is None:
+            ret[:, :, 3] = ret[:, :, 2] = ret[:, :, 1] = ret[:, :, 0] = im
+        else:
+            ret[:, :, 3] = im
+            ret[:, :, 2] = beauty_img[:, :, 2]
+            ret[:, :, 1] = beauty_img[:, :, 1]
+            ret[:, :, 0] = beauty_img[:, :, 0]
+
         return ret
+
+
+def read_image(img_file: Path, format: str=''):
+    img_input = oiio.ImageInput.open(img_file.as_posix())
+
+    if img_input is None:
+        LOGGER.error('Error reading image: %s', oiio.geterror())
+        return
+
+    img = img_input.read_image(format=format)
+    img_input.close()
+
+    return img
 
 
 def write_image(file: Path, pixels: np.array):
