@@ -98,6 +98,11 @@ def setup_mtoa():
     from mtoa.core import createOptions
     createOptions()
 
+    # Ignore errors - otherwise the batch render will fail with:
+    # "aborting render pass setup:  received abort signal"
+    # but no other obvious error messages
+    cmds.setAttr("defaultArnoldRenderOptions.abortOnError", 0)
+
     # --- Setup Cryptomatte AOV ---
     import mtoa.aovs as aovs
     try:
@@ -116,7 +121,7 @@ def setup_render_settings(render_camera='Camera', img_path='', env='.', renderer
         setup_sw()
     elif renderer == 'arnold':
         # Setup arnold renderer
-        settings_path = os.path.join(env, 'res/renderSettings_mtoa_crypto.json')
+        settings_path = os.path.join(env, 'res/renderSettings_mtoa.json')
         setup_mtoa()
     else:
         # Setup mayaHardware2 renderer
