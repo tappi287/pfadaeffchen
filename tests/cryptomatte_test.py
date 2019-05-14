@@ -1,4 +1,5 @@
 import OpenImageIO as oiio
+from OpenImageIO import ImageBuf, ImageBufAlgo, ImageSpec
 import logging
 from pathlib import Path
 from queue import Empty, Queue
@@ -16,6 +17,61 @@ LOGGER = logging.getLogger(__name__)
 def read_image(img_file: Path, format: str=''):
     img_input = oiio.ImageInput.open(img_file.as_posix())
     return img_input.read_image(format=format)
+
+
+def grayscale_to_rgba(im: np.ndarray, beauty_img: np.ndarray = None):
+    """ Convert single channel(grayscale) numpy array to 4 channel rgba 8bit """
+    w, h = im.shape
+
+
+    ret = np.empty((w, h, 4), dtype=np.uint8)
+
+    if beauty_img is None:
+        ret[:, :, 3] = ret[:, :, 2] = ret[:, :, 1] = ret[:, :, 0] = im
+    else:
+        ret[:, :, 3] = im
+        ret[:, :, 2] = beauty_img[:, :, 2]
+        ret[:, :, 1] = beauty_img[:, :, 1]
+        ret[:, :, 0] = beauty_img[:, :, 0]
+
+    return ret
+
+
+"""
+Examples:
+ImageBuf A ("a.exr");
+ImageBuf Inverse = ImageBufAlgo::invert (Inverse, A);
+// In this example, we are careful to deal with alpha in an RGBA image.
+// First we copy A to Inverse, un-premultiply the color values by alpha,
+// invert just the color channels in-place, and then re-premultiply the
+// colors by alpha.
+roi = A.roi();
+roi.chend = 3; // Restrict roi to only R,G,B
+ImageBuf Inverse = ImageBufAlgo::unpremult (A);
+ImageBufAlgo::invert (Inverse, Inverse, roi);
+ImageBufAlgo::premult (Inverse, Inverse);
+"""
+
+
+def write_repremultiplied_image(img_pixels: np.array):
+    if len(img_pixels.shape) < 3:
+        LOGGER.error('Can not create image with Pixel data in this shape. Expecting 4 channels(RGBA).')
+        return
+
+    w, h, c = img_pixels.shape
+    img_spec = ImageSpec(w, h, c, img_pixels.dtype.name)
+
+    # Create inverted alpha mask
+    a = ImageBuf()
+    a.set_pixels(img_spec.roi_full, img_pixels)
+    inverse = ImageBufAlgo.invert(a)
+
+    rgb_roi = a.roi
+    rgb_roi.chend = 3  # Restrict ROI to 3 channels
+
+    # --
+    inverse = ImageBufAlgo.unpremult(a)
+
 
 
 class CreateMattesThreaded:
@@ -89,9 +145,8 @@ class MatteWorker(Thread):
 
 
 def main():
-    # img_file = Path(r'H:\tmp\crypto_2\render_output\20180514_1557772447_8570\crypto_material\masterLayer.exr')
-    img_file = Path(r'I:\Nextcloud\py\_test_docs\crypto_material\masterLayer.exr')
-    beauty_img_file = Path(r'H:\tmp\crypto_2\render_output\20180514_1557772447_8570\beauty\masterLayer.exr')
+    img_file = Path(r'E:\tmp\crypto\images\tmp\crypto_material\test_scene.exr')
+    beauty_img_file = Path(r'E:\tmp\crypto\images\tmp\beauty\test_scene_1.exr')
     beauty_img = read_image(beauty_img_file, format='uint8')
 
     # matte_worker = CreateMattesThreaded(img_file, beauty_img_file)
@@ -103,7 +158,7 @@ def main():
     for layer_name, id_matte in d.get_mattes_by_names(layers).items():
         LOGGER.debug('Layer %s - %s', layer_name, id_matte.any(axis=-1).sum())
 
-        rgba_matte = d.grayscale_to_rgba(np.uint8(id_matte * 255), beauty_img)
+        rgba_matte = grayscale_to_rgba(np.uint8(id_matte * 255), beauty_img)
         matte_img_file = img_file.parent / f'{layer_name}.png'
 
         write_image(matte_img_file, rgba_matte)
