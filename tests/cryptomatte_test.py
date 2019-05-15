@@ -18,25 +18,6 @@ def read_image(img_file: Path, format: str=''):
     img_input = oiio.ImageInput.open(img_file.as_posix())
     return img_input.read_image(format=format)
 
-
-def grayscale_to_rgba(im: np.ndarray, beauty_img: np.ndarray = None):
-    """ Convert single channel(grayscale) numpy array to 4 channel rgba 8bit """
-    w, h = im.shape
-
-
-    ret = np.empty((w, h, 4), dtype=np.uint8)
-
-    if beauty_img is None:
-        ret[:, :, 3] = ret[:, :, 2] = ret[:, :, 1] = ret[:, :, 0] = im
-    else:
-        ret[:, :, 3] = im
-        ret[:, :, 2] = beauty_img[:, :, 2]
-        ret[:, :, 1] = beauty_img[:, :, 1]
-        ret[:, :, 0] = beauty_img[:, :, 0]
-
-    return ret
-
-
 """
 Examples:
 ImageBuf A ("a.exr");
@@ -53,24 +34,27 @@ ImageBufAlgo::premult (Inverse, Inverse);
 """
 
 
-def write_repremultiplied_image(img_pixels: np.array):
+def repremultiply_image(img_pixels: np.array) -> np.array:
     if len(img_pixels.shape) < 3:
         LOGGER.error('Can not create image with Pixel data in this shape. Expecting 4 channels(RGBA).')
         return
 
-    w, h, c = img_pixels.shape
+    h, w, c = img_pixels.shape
     img_spec = ImageSpec(w, h, c, img_pixels.dtype.name)
 
-    # Create inverted alpha mask
-    a = ImageBuf()
+    a = ImageBuf(img_spec)
     a.set_pixels(img_spec.roi_full, img_pixels)
-    inverse = ImageBufAlgo.invert(a)
+    inverse = ImageBufAlgo.invert(a, img_spec.roi_full)
 
-    rgb_roi = a.roi
-    rgb_roi.chend = 3  # Restrict ROI to 3 channels
+    only_rgb = a.roi
+    only_rgb.chend = 3
 
-    # --
-    inverse = ImageBufAlgo.unpremult(a)
+    unpre_a = ImageBufAlgo.unpremult(a)
+    ImageBufAlgo.invert(inverse, inverse, only_rgb)
+    ImageBufAlgo.premult(inverse, a)
+
+    return inverse.get_pixels(img_spec.format, img_spec.roi_full)
+
 
 
 
@@ -145,8 +129,8 @@ class MatteWorker(Thread):
 
 
 def main():
-    img_file = Path(r'E:\tmp\crypto\images\tmp\crypto_material\test_scene.exr')
-    beauty_img_file = Path(r'E:\tmp\crypto\images\tmp\beauty\test_scene_1.exr')
+    img_file = Path(r'I:\Nextcloud\py\maya_scripts\_test_scene\images\tmp\crypto_material\test_scene.exr')
+    beauty_img_file = Path(r'I:\Nextcloud\py\maya_scripts\_test_scene\images\tmp\beauty\test_scene_1.exr')
     beauty_img = read_image(beauty_img_file, format='uint8')
 
     # matte_worker = CreateMattesThreaded(img_file, beauty_img_file)
@@ -158,10 +142,13 @@ def main():
     for layer_name, id_matte in d.get_mattes_by_names(layers).items():
         LOGGER.debug('Layer %s - %s', layer_name, id_matte.any(axis=-1).sum())
 
-        rgba_matte = grayscale_to_rgba(np.uint8(id_matte * 255), beauty_img)
+        rgba_matte = d.grayscale_to_rgba(np.uint8(id_matte * 255), beauty_img)
+        repre_matte = repremultiply_image(rgba_matte)
         matte_img_file = img_file.parent / f'{layer_name}.png'
+        repre_img_file = img_file.parent / f'{layer_name}_repremul.png'
 
         write_image(matte_img_file, rgba_matte)
+        write_image(repre_img_file, repre_matte)
     LOGGER.debug('Example matte extraction finished.')
 
 
