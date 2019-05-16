@@ -28,7 +28,7 @@ from pathlib import Path
 from PyQt5 import QtCore
 from subprocess import TimeoutExpired
 
-from modules.decryptomatte import DecyrptoMatte, write_image, read_image
+from modules.decryptomatte import DecyrptoMatte, OpenImageUtil
 from modules.detect_lang import get_translation
 from modules.setup_log import add_queue_handler, setup_logging, setup_queued_logger
 from modules.check_file_access import CheckFileAccess
@@ -131,7 +131,7 @@ class ImageFileWatcher(QtCore.QThread):
     # Scan interval in milliseconds
     interval = 15000
     cryptomatte_dir_name = 'crypto_material'
-    cryptomatte_out_file_ext = 'png'
+    cryptomatte_out_file_ext = 'iff'
 
     # Thread Pool
     # increase thread timeout to 4 mins
@@ -677,6 +677,7 @@ class ProcessImage(QtCore.QRunnable):
 
 class CreateCryptomattes:
     def __init__(self, output_dir: Path):
+        self.img_util = OpenImageUtil()
         self.output_dir = output_dir
         self.cryptomatte_dir_name = ImageFileWatcher.cryptomatte_dir_name
         self.cryptomatte_out_file_ext = ImageFileWatcher.cryptomatte_out_file_ext
@@ -693,22 +694,26 @@ class CreateCryptomattes:
         else:
             return img_file_dict, img_file_dict
 
-        # Use beauty render if available and convert to 8bit
+        # Use beauty render if available
         if beauty_f:
-            beauty_img = read_image(beauty_f[0], format='uint8')
+            beauty_img = self.img_util.read_image(beauty_f[0])
 
         d = DecyrptoMatte(LOGGER, img_file)
         layers = d.list_layers()
         id_mattes = d.get_mattes_by_names(layers)
 
         for layer_name, id_matte in id_mattes.items():
-            rgba_matte = d.grayscale_to_rgba(np.uint8(id_matte * 255), beauty_img=beauty_img)
+            # Combine beauty and coverage matte
+            rgba_matte = d.merge_matte_and_rgb(id_matte, beauty_img)
+
+            # Premultiply rgba matte
+            rgba_matte = self.img_util.premultiply_image(rgba_matte)
             matte_img_file = self.output_dir / f'{create_file_safe_name(layer_name)}.{self.cryptomatte_out_file_ext}'
 
             # Create image file dict entry
             img_file_dict.update({matte_img_file.stem: dict(path=matte_img_file, processed=True)})
             # Create image
-            write_image(matte_img_file, rgba_matte)
+            self.img_util.write_image(matte_img_file, rgba_matte)
 
         # CleanUp
         d.shutdown()

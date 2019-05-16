@@ -7,7 +7,7 @@ from threading import Thread
 
 import numpy as np
 
-from modules.decryptomatte import DecyrptoMatte, write_image
+from modules.decryptomatte import DecyrptoMatte, OpenImageUtil
 from modules.utils import create_file_safe_name
 
 logging.basicConfig(level=logging.DEBUG)
@@ -16,6 +16,10 @@ LOGGER = logging.getLogger(__name__)
 
 def read_image(img_file: Path, format: str=''):
     img_input = oiio.ImageInput.open(img_file.as_posix())
+    if img_input is None:
+        LOGGER.error('Error reading image: %s', oiio.geterror())
+        return
+
     return img_input.read_image(format=format)
 
 """
@@ -34,28 +38,35 @@ ImageBufAlgo::premult (Inverse, Inverse);
 """
 
 
-def repremultiply_image(img_pixels: np.array) -> np.array:
+def premultiply_image(img_pixels: np.array) -> np.array:
+    a = np_to_imagebuf(img_pixels)
+    ImageBufAlgo.premult(a, a)
+
+    return a.get_pixels(a.spec().format, a.spec().roi_full)
+
+    inverse = ImageBufAlgo.invert(a, a.spec().roi_full)
+
+    only_rgb = a.roi
+    only_rgb.chend = 3
+
+    ImageBufAlgo.invert(inverse, inverse, only_rgb)
+    ImageBufAlgo.premult(inverse, a)
+
+    return inverse.get_pixels(a.spec().format, a.spec().roi_full)
+
+
+def np_to_imagebuf(img_pixels: np.array):
     if len(img_pixels.shape) < 3:
         LOGGER.error('Can not create image with Pixel data in this shape. Expecting 4 channels(RGBA).')
         return
 
     h, w, c = img_pixels.shape
-    img_spec = ImageSpec(w, h, c, img_pixels.dtype.name)
+    img_spec = ImageSpec(w, h, c, oiio.FLOAT)
 
-    a = ImageBuf(img_spec)
-    a.set_pixels(img_spec.roi_full, img_pixels)
-    inverse = ImageBufAlgo.invert(a, img_spec.roi_full)
+    img_buf = ImageBuf(img_spec)
+    img_buf.set_pixels(img_spec.roi_full, img_pixels)
 
-    only_rgb = a.roi
-    only_rgb.chend = 3
-
-    unpre_a = ImageBufAlgo.unpremult(a)
-    ImageBufAlgo.invert(inverse, inverse, only_rgb)
-    ImageBufAlgo.premult(inverse, a)
-
-    return inverse.get_pixels(img_spec.format, img_spec.roi_full)
-
-
+    return img_buf
 
 
 class CreateMattesThreaded:
@@ -120,18 +131,19 @@ class MatteWorker(Thread):
                 else:
                     matte_img_file = self.img_file.parent / f'{create_file_safe_name(layer_name)}.png'
 
-                write_image(
+                OpenImageUtil.write_image(
                     matte_img_file,
-                    d.grayscale_to_rgba(np.uint8(id_matte * 255), self.beauty)
+                    d.merge_matte_and_rgb(np.uint8(id_matte * 255), self.beauty)
                     )
 
             del id_mattes
 
 
 def main():
-    img_file = Path(r'I:\Nextcloud\py\maya_scripts\_test_scene\images\tmp\crypto_material\test_scene.exr')
-    beauty_img_file = Path(r'I:\Nextcloud\py\maya_scripts\_test_scene\images\tmp\beauty\test_scene_1.exr')
-    beauty_img = read_image(beauty_img_file, format='uint8')
+    img_file = Path(r'H:\tmp\crypto_2\images\tmp\crypto_material\test_scene.exr')
+    beauty_img_file = Path(r'H:\tmp\crypto_2\images\tmp\beauty\test_scene_1.exr')
+    beauty_img = OpenImageUtil.read_image(beauty_img_file)
+    beauty_img = OpenImageUtil.premultiply_image(beauty_img)
 
     # matte_worker = CreateMattesThreaded(img_file, beauty_img_file)
     # matte_worker.start()
@@ -142,13 +154,15 @@ def main():
     for layer_name, id_matte in d.get_mattes_by_names(layers).items():
         LOGGER.debug('Layer %s - %s', layer_name, id_matte.any(axis=-1).sum())
 
-        rgba_matte = d.grayscale_to_rgba(np.uint8(id_matte * 255), beauty_img)
-        repre_matte = repremultiply_image(rgba_matte)
-        matte_img_file = img_file.parent / f'{layer_name}.png'
-        repre_img_file = img_file.parent / f'{layer_name}_repremul.png'
+        rgba_matte = d.merge_matte_and_rgb(id_matte, beauty_img)
+        repre_matte = OpenImageUtil.premultiply_image(rgba_matte)
+        matte_img_file = img_file.parent / f'{layer_name}.iff'
+        repre_img_file = img_file.parent / f'{layer_name}_premul.iff'
 
-        write_image(matte_img_file, rgba_matte)
-        write_image(repre_img_file, repre_matte)
+        OpenImageUtil.write_image(matte_img_file, rgba_matte)
+        OpenImageUtil.write_image(repre_img_file, repre_matte)
+
+    d.shutdown()
     LOGGER.debug('Example matte extraction finished.')
 
 

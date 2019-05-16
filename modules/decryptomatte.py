@@ -1,10 +1,11 @@
-import OpenImageIO as oiio
 import json
 import logging
 import mmh3
 import os
 import struct
-from OpenImageIO import ImageBuf, ImageOutput, ImageSpec
+
+import OpenImageIO as oiio
+from OpenImageIO import ImageBuf, ImageOutput, ImageSpec, ImageBufAlgo
 from pathlib import Path
 from typing import List, Dict
 
@@ -38,6 +39,7 @@ class DecyrptoMatte:
             del self.manifest_cache
             self.img.clear()
             del self.img
+            oiio.ImageCache().invalidate(self.img_file.as_posix())
         except Exception as e:
             LOGGER.error('Error closing img buf: %s', e)
 
@@ -166,7 +168,7 @@ class DecyrptoMatte:
 
         # Create dictionary that will store the coverage matte arrays per id
         w, h = self.img.spec().width, self.img.spec().height
-        id_mattes = {id_val: np.zeros((h, w), dtype=np.float16) for id_val in target_ids}
+        id_mattes = {id_val: np.zeros((h, w), dtype=np.float32) for id_val in target_ids}
 
         for y in range(0, h):
             for x in range(0, w):
@@ -246,53 +248,87 @@ class DecyrptoMatte:
         """ Convert a layer name to hash hex string """
         return cls.id_to_hex_str(cls.mm3hash_float(layer_name))[:-1]
 
-    @staticmethod
-    def grayscale_to_rgba(im, beauty_img: np.ndarray=None):
-        """ Convert single channel(grayscale) numpy array to 4 channel rgba 8bit """
-        w, h = im.shape
-        ret = np.empty((w, h, 4), dtype=np.uint8)
+    @classmethod
+    def merge_matte_and_rgb(cls, matte: np.ndarray, rgb_img: np.ndarray=None):
+        """ Merge matte and rgb img array to rgba img array"""
+        h, w = matte.shape
+        rgba = np.empty((h, w, 4), dtype=matte.dtype)
 
-        if beauty_img is None:
-            ret[:, :, 3] = ret[:, :, 2] = ret[:, :, 1] = ret[:, :, 0] = im
+        if rgb_img is None:
+            rgba[:, :, 3] = rgba[:, :, 2] = rgba[:, :, 1] = rgba[:, :, 0] = matte
         else:
-            ret[:, :, 3] = im
-            ret[:, :, 2] = beauty_img[:, :, 2]
-            ret[:, :, 1] = beauty_img[:, :, 1]
-            ret[:, :, 0] = beauty_img[:, :, 0]
+            rgba[:, :, 3] = matte
+            rgba[:, :, 2] = rgb_img[:, :, 2]
+            rgba[:, :, 1] = rgb_img[:, :, 1]
+            rgba[:, :, 0] = rgb_img[:, :, 0]
 
-        return ret
-
-
-def read_image(img_file: Path, format: str=''):
-    img_input = oiio.ImageInput.open(img_file.as_posix())
-
-    if img_input is None:
-        LOGGER.error('Error reading image: %s', oiio.geterror())
-        return
-
-    img = img_input.read_image(format=format)
-    img_input.close()
-
-    return img
+        return rgba
 
 
-def write_image(file: Path, pixels: np.array):
-    output = ImageOutput.create(file.as_posix())
-    if not output:
-        LOGGER.error('Error creating oiio image output:\n%s', oiio.geterror())
-        return
+class OpenImageUtil:
+    @classmethod
+    def premultiply_image(cls, img_pixels: np.array) -> np.array:
+        """ Premultiply a numpy image with itself """
+        a = cls.np_to_imagebuf(img_pixels)
+        ImageBufAlgo.premult(a, a)
 
-    if len(pixels.shape) < 3:
-        LOGGER.error('Can not create image with Pixel data in this shape. Expecting 3 or 4 channels(RGB, RGBA).')
-        return
+        return a.get_pixels(a.spec().format, a.spec().roi_full)
 
-    h, w, c = pixels.shape
-    spec = ImageSpec(w, h, c, pixels.dtype.name)
+    @staticmethod
+    def get_numpy_oiio_img_format(np_array: np.ndarray):
+        """ Returns either float or 8 bit integer format"""
+        img_format = oiio.FLOAT
+        if np_array.dtype != np.float32:
+            img_format = oiio.UINT8
 
-    result = output.open(file.as_posix(), spec)
-    if result:
-        output.write_image(pixels)
-    else:
-        LOGGER.error('Could not open image file for writing: %s: %s', file.name, output.geterror())
+        return img_format
 
-    output.close()
+    @classmethod
+    def np_to_imagebuf(cls, img_pixels: np.array):
+        """ Load a numpy array 8/32bit to oiio ImageBuf """
+        if len(img_pixels.shape) < 3:
+            LOGGER.error('Can not create image with Pixel data in this shape. Expecting 4 channels(RGBA).')
+            return
+
+        h, w, c = img_pixels.shape
+        img_spec = ImageSpec(w, h, c, cls.get_numpy_oiio_img_format(img_pixels))
+
+        img_buf = ImageBuf(img_spec)
+        img_buf.set_pixels(img_spec.roi_full, img_pixels)
+
+        return img_buf
+
+    @staticmethod
+    def read_image(img_file: Path, format: str=''):
+        img_input = oiio.ImageInput.open(img_file.as_posix())
+
+        if img_input is None:
+            LOGGER.error('Error reading image: %s', oiio.geterror())
+            return
+
+        img = img_input.read_image(format=format)
+        img_input.close()
+
+        return img
+
+    @classmethod
+    def write_image(cls, file: Path, pixels: np.array):
+        output = ImageOutput.create(file.as_posix())
+        if not output:
+            LOGGER.error('Error creating oiio image output:\n%s', oiio.geterror())
+            return
+
+        if len(pixels.shape) < 3:
+            LOGGER.error('Can not create image with Pixel data in this shape. Expecting 3 or 4 channels(RGB, RGBA).')
+            return
+
+        h, w, c = pixels.shape
+        spec = ImageSpec(w, h, c, cls.get_numpy_oiio_img_format(pixels))
+
+        result = output.open(file.as_posix(), spec)
+        if result:
+            output.write_image(pixels)
+        else:
+            LOGGER.error('Could not open image file for writing: %s: %s', file.name, output.geterror())
+
+        output.close()

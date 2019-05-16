@@ -178,12 +178,22 @@ class MayaMatteLayer(object):
 
 def create(maya_delete_hidden=1, renderer='mayaSoftware'):
     if renderer == 'arnold':
-        maya_delete.all_lights()
+        # Delete all lights
+        try:
+            maya_delete.all_lights()
+        except Exception as e:
+            LOGGER.error(e)
+
         maya_tappitilitys.create_arnold_default_light()
 
         # Make sure shadingGroups contain only ASCII characters
         # otherwise AOV creation may fail
         maya_tappitilitys.MayaUtils.rename_shading_grps_to_ascii()
+
+        try:
+            convertAllShaders()
+        except Exception as e:
+            LOGGER.error('Error converting scene shader to arnold: %s', e)
 
         """ Skip render layer setup, we will use cryptomatte crypto_material AOV with arnold """
         return 2

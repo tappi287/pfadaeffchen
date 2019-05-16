@@ -339,7 +339,9 @@ def convertLambert(inShd, outShd):
     #print 'lambert'
 
 
-def convertBlinn(inShd, outShd):        
+def convertBlinn(inShd, outShd):
+    # Remove DeltaGen refl default import value
+    setValue(inShd + '.reflectivity', 0.0)
     setValue(outShd + '.emission', 1.0)
 
     # Catch DeltaGen negative eccentricity values
