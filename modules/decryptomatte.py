@@ -180,6 +180,14 @@ class DecyrptoMatte:
                         img_nested_md[cryp_key]["ch_pair_idxs"]
                         )
 
+                    """
+                    # Full coverage per Pixel, if eg. 2 IDs are contributing so that mask is fully opaque
+
+                    pixel_id_coverage = 0.0  # Coverage from -any- ID
+                    for id_val, coverage in result_id_cov.items():
+                        if id_val in id_mattes:
+                            pixel_id_coverage += coverage
+                    """
                     for id_val, coverage in result_id_cov.items():
                         if id_val in id_mattes:
                             # Sum coverage per id

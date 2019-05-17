@@ -156,8 +156,8 @@ def main():
 
         rgba_matte = d.merge_matte_and_rgb(id_matte, beauty_img)
         repre_matte = OpenImageUtil.premultiply_image(rgba_matte)
-        matte_img_file = img_file.parent / f'{layer_name}.iff'
-        repre_img_file = img_file.parent / f'{layer_name}_premul.iff'
+        matte_img_file = img_file.parent / f'{layer_name}.exr'
+        repre_img_file = img_file.parent / f'{layer_name}_premul.exr'
 
         OpenImageUtil.write_image(matte_img_file, rgba_matte)
         OpenImageUtil.write_image(repre_img_file, repre_matte)
