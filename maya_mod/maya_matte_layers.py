@@ -27,6 +27,7 @@
 
 import maya.api.OpenMaya as Om
 import maya.app.renderSetup.model.renderSetup as renderSetup
+import logging
 from maya.app.renderSetup.model import typeIDs
 
 from .mrShadersToArnold import convertAllShaders
@@ -36,10 +37,6 @@ from . import maya_delete
 from modules.setup_log import setup_logging
 
 LOGGER = setup_logging(__name__)
-
-# Make sure we use the most current version of our modules
-reload(maya_tappitilitys)
-reload(maya_render_settings)
 
 maya_useNewAPI = True
 
@@ -177,27 +174,6 @@ class MayaMatteLayer(object):
 
 
 def create(maya_delete_hidden=1, renderer='mayaSoftware'):
-    if renderer == 'arnold':
-        # Delete all lights
-        try:
-            maya_delete.all_lights()
-        except Exception as e:
-            LOGGER.error(e)
-
-        maya_tappitilitys.create_arnold_default_light()
-
-        # Make sure shadingGroups contain only ASCII characters
-        # otherwise AOV creation may fail
-        maya_tappitilitys.MayaUtils.rename_shading_grps_to_ascii()
-
-        try:
-            convertAllShaders()
-        except Exception as e:
-            LOGGER.error('Error converting scene shader to arnold: %s', e)
-
-        """ Skip render layer setup, we will use cryptomatte crypto_material AOV with arnold """
-        return 2
-
     # Delete all hidden objects
     try:
         if maya_delete_hidden:
@@ -217,11 +193,27 @@ def create(maya_delete_hidden=1, renderer='mayaSoftware'):
     except Exception as e:
         LOGGER.error(e)
 
-    """
-    # Arnold Setup
-    # Convert materials to AI Standard Shader
-    convertAllShaders()
-    """
+    if renderer == 'arnold':
+        maya_tappitilitys.create_arnold_default_light()
+
+        # Make sure shadingGroups contain only ASCII characters
+        # otherwise AOV creation may fail
+        maya_tappitilitys.MayaUtils.rename_shading_grps_to_ascii()
+
+        # Convert all materials to ai_standard shader
+        log_level = LOGGER.getEffectiveLevel()
+        logging.root.setLevel(logging.ERROR)
+        try:
+            convertAllShaders()
+        except Exception as e:
+            LOGGER.error('Shader conversion failed with error: %s', e)
+        logging.root.setLevel(log_level)
+
+        """
+            Skip render layer setup, we will use cryptomatte crypto_material AOV with arnold
+            Return 10 as number of layers so we can update batch render status in 10% steps
+        """
+        return 10
 
     # Create RenderSetup instance
     rs = renderSetup.instance()

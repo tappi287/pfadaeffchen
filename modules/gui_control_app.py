@@ -429,7 +429,7 @@ class ControlApp(QtCore.QObject, LedControl):
 
     def start_render_process(self):
         """ Start the layer creation process """
-        args = (self.logging_queue,             # Provide with the logging queue
+        args = (LOGGER,             # Provide with the logging queue
                 self.current_job.file,          # Arg Scene file
                 self.current_job.render_dir,    # Arg Render path
                 self.mod_dir,                   # Arg Env / module directory

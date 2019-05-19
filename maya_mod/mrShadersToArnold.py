@@ -12,8 +12,13 @@
 import maya.cmds as cmds
 import math
 
+from modules.setup_log import setup_logging
+
+LOGGER = setup_logging(__name__)
+
 replaceShaders = True
-targetShaders = ['VRayMtl', 'lambert', 'blinn', 'phong', 'mia_material_x_passes', 'mia_material_x', 'dielectric_material']
+# targetShaders = ['VRayMtl', 'lambert', 'blinn', 'phong', 'mia_material_x_passes', 'mia_material_x', 'dielectric_material']
+targetShaders = ['lambert', 'blinn', 'phong']
    
 
 mappingVRMtl = [
@@ -122,6 +127,7 @@ def convertAllShaders():
 
     for shdType in targetShaders:
         shaderColl = cmds.ls(exactType=shdType)
+
         if shaderColl:
             for x in shaderColl:
                 # query the objects assigned to the shader
@@ -130,7 +136,6 @@ def convertAllShaders():
                 setMem = cmds.sets( shdGroup, query=True )
                 if setMem:
                     ret = doMapping(x)
-        
 
 
 def doMapping(inShd):
@@ -173,13 +178,14 @@ def doMapping(inShd):
     #        if not conns:
     #            val = cmds.getAttr(ret + '.' + chan)
     #            setValue(ret + '.' + chan, (1 - val))
-        
-        
+
     if ret:
-        # assign objects to the new shader
-        assignToNewShader(inShd, ret)
-
-
+        try:
+            LOGGER.info('Assigning Shader: %s %s', inShd, ret)
+            # assign objects to the new shader
+            assignToNewShader(inShd, ret)
+        except Exception as e:
+            LOGGER.error('Error assigning new shader: %s', e)
 
 def assignToNewShader(oldShd, newShd):
     """
@@ -195,8 +201,6 @@ def assignToNewShader(oldShd, newShd):
     
     shdGroup = cmds.listConnections(oldShd, type="shadingEngine")
     
-    #print 'shdGroup:', shdGroup
-    
     if shdGroup:
         if replaceShaders:
             cmds.connectAttr(newShd + '.outColor', shdGroup[0] + '.surfaceShader', force=True)
@@ -204,7 +208,14 @@ def assignToNewShader(oldShd, newShd):
         else:
             cmds.connectAttr(newShd + '.outColor', shdGroup[0] + '.aiSurfaceShader', force=True)
         retVal =True
-        
+
+    # Rename new shader
+    if retVal:
+        try:
+            cmds.rename(newShd, oldShd)
+        except Exception as e:
+            LOGGER.error('Error renaming new shader: %s', e)
+
     return retVal
 
 
@@ -216,7 +227,6 @@ def setupConnections(inShd, fromAttr, outShd, toAttr):
 
     return False
                 
-            
 
 def shaderToAiStandard(inShd, nodeType, mapping):
     """
@@ -229,32 +239,37 @@ def shaderToAiStandard(inShd, nodeType, mapping):
     @param mapping: List of attributes to map from old to new
     @type mapping: List
     """
-    
-    #print 'Converting material:', inShd
-    
+
+    LOGGER.debug('Converting material: %s', inShd)
+
     if ':' in inShd:
         aiName = inShd.rsplit(':')[-1] + '_ai'
     else:
         aiName = inShd + '_ai'
         
-    #print 'creating '+ aiName
+    LOGGER.info('Creating %s', aiName)
     aiNode = cmds.shadingNode(nodeType, name=aiName, asShader=True)
     for chan in mapping:
         fromAttr = chan[0]
         toAttr = chan[1]
-        
-        if cmds.objExists(inShd + '.' + fromAttr):
-            #print '\t', fromAttr, ' -> ', toAttr
-            
-            if not setupConnections(inShd, fromAttr, aiNode, toAttr):
-                # copy the values
-                val = cmds.getAttr(inShd + '.' + fromAttr)
-                setValue(aiNode + '.' + toAttr, val)
-    
-    #print 'Done. New shader is ', aiNode
-    
+
+        try:
+            if cmds.objExists(inShd + '.' + fromAttr):
+                if not setupConnections(inShd, fromAttr, aiNode, toAttr):
+                    # copy the values
+                    val = cmds.getAttr(inShd + '.' + fromAttr)
+
+                    # avoid negative values
+                    if isinstance(val, float):
+                        val = max(0.0, val)
+                    if isinstance(val, int):
+                        val = max(0, val)
+
+                    setValue(aiNode + '.' + toAttr, val)
+        except Exception as e:
+            LOGGER.error('Error assigning value: %s', e)
+
     return aiNode
-        
 
 
 def setValue(attr, value):
@@ -275,9 +290,7 @@ def setValue(attr, value):
         # one last check to see if we can write to it
         if cmds.getAttr(attr, settable=True):
             attrType = cmds.getAttr(attr, type=True)
-            
-            print value, type(value)
-            
+
             if attrType in ['string']:
                 aType = 'string'
                 cmds.setAttr(attr, value, type=aType)
@@ -287,23 +300,22 @@ def setValue(attr, value):
                 try:
                     cmds.setAttr(attr, value)
                 except Exception as e:
-                    print(e)
+                    LOGGER.error(e)
                 
             elif attrType in ['long2', 'short2', 'float2',  'double2', 'long3', 'short3', 'float3',  'double3']:
                 if isinstance(value, float):
                     if attrType in ['long2', 'short2', 'float2',  'double2']:
-                        value = [(value,value)]
+                        value = [(value, value)]
                     elif attrType in ['long3', 'short3', 'float3',  'double3']:
                         value = [(value, value, value)]
 
                 try:
                     cmds.setAttr(attr, *value[0], type=attrType)
                 except Exception as e:
-                    print(e)
+                    LOGGER.error(e)
                 
             #else:
             #    print 'cannot yet handle that data type!!'
-
 
         if isLocked:
             # restore the lock on the attr
@@ -336,7 +348,6 @@ def transparencyToOpacity(inShd, outShd):
 
 def convertLambert(inShd, outShd):        
     transparencyToOpacity(inShd, outShd)
-    #print 'lambert'
 
 
 def convertBlinn(inShd, outShd):
@@ -500,7 +511,7 @@ def convertOptions():
     cmds.setAttr("defaultArnoldRenderOptions.GIRefractionDepth", 10)
     
 
-def isOpaque (shapeName):
+def isOpaque(shapeName):
 
     mySGs = cmds.listConnections(shapeName, type='shadingEngine')
     if not mySGs:
@@ -522,30 +533,17 @@ def isOpaque (shapeName):
         
         if opacity[0][0] < 1.0 or opacity[0][1] < 1.0 or opacity[0][2] < 1.0:
             return 0
-        
-
 
     return 1
 
 
 def setupOpacities():
     shapes = cmds.ls(type='geometryShape')
-    for shape in shapes:       
-        
+    for shape in shapes:
         if isOpaque(shape) == 0:
             #print shape + ' is transparent'
-            cmds.setAttr(shape+".aiOpaque", 0)  
-        
-            
+            cmds.setAttr(shape+".aiOpaque", 0)
 
 
 if not cmds.pluginInfo( 'mtoa', query=True, loaded=True ):
     cmds.loadPlugin('mtoa')
-
-convertUi()
-
-
-
-
-
-

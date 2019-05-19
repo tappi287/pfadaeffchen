@@ -305,7 +305,7 @@ class ImageFileWatcher(QtCore.QThread):
         # Watch for arnold render results
         if (self.output_dir / self.cryptomatte_dir_name).exists() or (self.output_dir / 'beauty').exists():
             self.is_arnold = True
-            self.file_created_signal.emit(set(), 2)
+            # self.file_created_signal.emit(set(), 2)
 
         self.watcher_img_dict = img_dict
 
@@ -351,7 +351,7 @@ class ImageFileWatcher(QtCore.QThread):
 
         if self.is_arnold:
             self.status_signal.emit(_('Cryptomatten werden erstellt.'))
-            self.file_created_signal.emit(set(), 3)
+            # self.file_created_signal.emit(set(), 3)
 
             c = CreateCryptomattes(self.output_dir)
             self.watcher_img_dict, self.processed_img_dict = c.create_cryptomattes()

@@ -60,8 +60,7 @@ def delete(dag_path_array):
         objects_to_delete.append(dag_path.fullPathName())
 
     try:
-        # cmds.delete(objects_to_delete)
-        pm.delete(objects_to_delete, inputConnectionsAndNodes=False)
+        pm.delete(objects_to_delete)
     except Exception as e:
         LOGGER.error(e)
 
@@ -74,8 +73,19 @@ def hidden_objects():
     last_hidden_node = ''
     search = '.*?({})'
 
+    transforms = Om.MDagPathArray()
     for dag_path in dag_path_iterator(traversal_type=Om.MItDag.kDepthFirst):
-        if dag_path.hasFn(Om.MFn.kCamera) or dag_path.isInstanced() or dag_path.isVisible():
+        if dag_path.hasFn(Om.MFn.kTransform) and dag_path.isInstanced() and not dag_path.hasFn(Om.MFn.kCamera):
+            if not pm.getAttr(dag_path.partialPathName() + '.visibility'):
+                transforms.append(dag_path)
+
+    if transforms:
+        LOGGER.info('Deleting %s hidden instances. (Instanced transform nodes that have been hidden'
+                    'by the user or importer.', len(transforms))
+        delete(transforms)
+
+    for dag_path in dag_path_iterator(traversal_type=Om.MItDag.kDepthFirst):
+        if dag_path.hasFn(Om.MFn.kCamera) or dag_path.isVisible() or dag_path.isInstanced():
             # Skip cameras, instances, visible objects
             continue
 
@@ -90,7 +100,7 @@ def hidden_objects():
         # Unique path to this hidden node(in allmighty unicode encoded as utf-8)
         last_hidden_node = unicode(dag_path.partialPathName()).encode('utf-8')
 
-        LOGGER.debug('Deleting hidden scene objects: %s', dag_path.fullPathName())
+        LOGGER.info('Deleting hidden scene object: %s', dag_path.fullPathName())
         hidden_paths.append(dag_path)
 
     if hidden_paths:

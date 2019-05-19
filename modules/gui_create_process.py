@@ -23,17 +23,18 @@
         along with Pfad Aeffchen.  If not, see <http://www.gnu.org/licenses/>.
 """
 import os
+import re
 import threading
 
 from PyQt5 import QtCore
 
 from maya_mod.start_command_line_render import run_command_line_render
 from maya_mod.start_mayapy import run_module_in_standalone
-from modules.setup_log import setup_queued_logger
+from maya_mod.socket_client import send_message
 from modules.app_globals import ImgParams
 
 
-def log_subprocess_output(pipe):
+def log_subprocess_output(pipe, out_signal=None):
     """ Redirect subprocess output to logging so it appears in console and log file """
     for line in iter(pipe.readline, b''):
         #TODO fix logging accssessing log file
@@ -41,10 +42,13 @@ def log_subprocess_output(pipe):
             line = line.decode(encoding='utf-8')
             line = line.replace('\n', '')
         except Exception as e:
-            LOGGER.error('%s', e)
+            LOGGER.error('Error decoding process output: %s', e)
 
         if line:
             LOGGER.info('%s', line)
+
+            if out_signal:
+                out_signal.emit(line)
 
 
 class RunLayerCreationSignals(QtCore.QObject):
@@ -52,11 +56,13 @@ class RunLayerCreationSignals(QtCore.QObject):
     failed = QtCore.pyqtSignal()
     update_job_status = QtCore.pyqtSignal(int)
 
+    render_output_sig = QtCore.pyqtSignal(str)
+
 
 class RunLayerCreationProcess(threading.Thread):
     def __init__(self,
                  # Logging instance
-                 logging_queue,
+                 main_logger,
                  # Process Arguments
                  scene_file, render_path, module_dir=None, ignore_hidden='1', delete_hidden='1',
                  version=None, use_renderer='',
@@ -64,11 +70,11 @@ class RunLayerCreationProcess(threading.Thread):
                  callback=None, failed_callback=None, status_callback=None):
         super(RunLayerCreationProcess, self).__init__()
         global LOGGER
-        LOGGER = setup_queued_logger(__name__, logging_queue)
+        LOGGER = main_logger
 
         self.scene_file, self.render_path = scene_file, render_path
         self.module_dir, self.version = module_dir, version
-        self.use_renderer, self.ignoreHidden = use_renderer, ignore_hidden
+        self.renderer, self.ignoreHidden = use_renderer, ignore_hidden
         self.delete_hidden = delete_hidden
 
         # Prepare signals
@@ -79,6 +85,8 @@ class RunLayerCreationProcess(threading.Thread):
             self.signals.failed.connect(failed_callback)
         if status_callback:
             self.signals.update_job_status.connect(status_callback)
+
+        self.signals.render_output_sig.connect(self.check_arnold_render_output)
 
         # Render scene file
         base_dir = os.path.dirname(self.scene_file)
@@ -143,14 +151,14 @@ class RunLayerCreationProcess(threading.Thread):
         LOGGER.info('Starting maya standalone with: %s\n%s, %s, %s, %s, %s, %s, %s, pipe_output=%s',
                     os.path.basename(module_file),
                     self.scene_file, self.render_path, self.module_dir,
-                    self.version, self.use_renderer, self.ignoreHidden, self.delete_hidden, True)
+                    self.version, self.renderer, self.ignoreHidden, self.delete_hidden, True)
 
         # Start process
         try:
             self.process = run_module_in_standalone(
                 module_file,
                 # Additional arguments for run_create_matte_layers.py:
-                self.scene_file, self.render_path, self.module_dir, self.version, self.use_renderer,
+                self.scene_file, self.render_path, self.module_dir, self.version, self.renderer,
                 self.ignoreHidden, self.delete_hidden,
                 pipe_output=True,     # Return a process that has output set to PIPE
                 version=self.version  # mayapy version to use
@@ -181,7 +189,7 @@ class RunLayerCreationProcess(threading.Thread):
             self.render_process_exitcode = -1
             return
 
-        if self.use_renderer == 'arnold':
+        if self.renderer == 'arnold':
             img_ext = ImgParams.extension_arnold
         else:
             img_ext = ImgParams.extension
@@ -201,8 +209,12 @@ class RunLayerCreationProcess(threading.Thread):
 
     def render_process_log_loop(self):
         """ Reads and writes process stdout to log until process ends """
+        render_sig = None
+        if self.renderer == 'arnold':
+            render_sig = self.signals.render_output_sig
+
         with self.render_process.stdout:
-            log_subprocess_output(self.render_process.stdout)
+            log_subprocess_output(self.render_process.stdout, render_sig)
 
         LOGGER.info('Maya batch process stdout stream ended. Fetching exitcode.')
         self.render_process_exitcode = self.render_process.wait()
@@ -210,6 +222,24 @@ class RunLayerCreationProcess(threading.Thread):
 
         # Wake up parent thread
         self.event.set()
+
+    @staticmethod
+    def check_arnold_render_output(line: str):
+        """
+            Receives batch render process output for rendering status
+            Arnold prints "0% done" status
+        """
+        match = r'(\d+)(\%\sdone)'
+        m = re.search(match, line)
+
+        if m and m.groups():
+            percent = m.groups()[0]
+            if isinstance(percent, str) and percent.isdigit():
+                p = int(percent)
+                if not p % 10:  # Update on every 10 percent progress
+                    img_num = 1 + round(p * 0.1)
+                    send_message(f'COMMAND IMG_NUM {img_num}')
+                    send_message(f'COMMAND STATUS_NAME Rendering {int(percent):02d}%')
 
     def kill_process(self):
         if self.process:
