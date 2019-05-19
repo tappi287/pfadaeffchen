@@ -48,7 +48,8 @@ def log_subprocess_output(pipe, out_signal=None):
             LOGGER.info('%s', line)
 
             if out_signal:
-                out_signal.emit(line)
+                if isinstance(line, str):
+                    out_signal.emit(line)
 
 
 class RunLayerCreationSignals(QtCore.QObject):

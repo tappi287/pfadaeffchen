@@ -390,7 +390,7 @@ class ServiceManager(QThread):
             if msg != 'GET_JOB_DATA':
                 LOGGER.debug('Service Manager received: "%s" from client %s', msg, client_name)
         else:
-            LOGGER.info('Service manager received: %s', msg)
+            LOGGER.debug('Service manager received: %s', msg)
 
         response = 'Unknown command or Job you referred to is no longer in the queue.'
 
