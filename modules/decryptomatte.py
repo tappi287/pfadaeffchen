@@ -5,17 +5,17 @@ import os
 import struct
 
 import OpenImageIO as oiio
-from OpenImageIO import ImageBuf, ImageOutput, ImageSpec, ImageBufAlgo
+from OpenImageIO import ImageBuf
 from pathlib import Path
-from typing import List, Dict
+from typing import List
 
 import numpy as np
 
 
 class DecyrptoMatte:
     """ Most of this code is shamelessly stolen from original cryptomatte_arnold unit tests under BSD-3 license
-        https://github.com/Psyop/Cryptomatte
         https://github.com/Psyop/CryptomatteArnold
+        https://github.com/Psyop/Cryptomatte
     """
     empty_pixel_threshold = 5  # Minimum number of opaque pixels a matte must contain
     empty_value_threshold = 0.2  # Minimum sum of all coverage values of all pixels
@@ -44,6 +44,7 @@ class DecyrptoMatte:
             LOGGER.error('Error closing img buf: %s', e)
 
     def _create_manifest_cache(self, metadata):
+        """ Store the manifest contents from extracted metadata """
         if not self.manifest_cache:
             manifest = [m for k, m in metadata.items() if k.endswith('manifest')]
             if manifest:
@@ -65,7 +66,7 @@ class DecyrptoMatte:
         return layer_names
 
     def crypto_metadata(self) -> dict:
-        """Returns dictionary of key, value of cryptomatte metadata"""
+        """ Returns dictionary of key, value of cryptomatte metadata """
         if self.metadata_cache:
             return self.metadata_cache
 
@@ -148,12 +149,12 @@ class DecyrptoMatte:
                 id_to_names[id_val] = name
 
         id_mattes_by_name = dict()
-        for id_val, id_matte in self._get_mattes(list(id_to_names.keys())).items():
+        for id_val, id_matte in self._get_mattes_per_id(list(id_to_names.keys())).items():
             id_mattes_by_name[id_to_names.get(id_val)] = id_matte
 
         return id_mattes_by_name
 
-    def _get_mattes(self, target_ids: List[float]) -> dict:
+    def _get_mattes_per_id(self, target_ids: List[float]) -> dict:
         """
             Get a alpha coverage matte for every given id
             as dict {id_value[float]: coverage_matte[np.array]}
@@ -175,7 +176,7 @@ class DecyrptoMatte:
                 result_pixel = self.img.getpixel(x, y)
 
                 for cryp_key in img_nested_md:
-                    result_id_cov = self.get_id_coverage_dict(
+                    result_id_cov = self._get_id_coverage_dict(
                         result_pixel,
                         img_nested_md[cryp_key]["ch_pair_idxs"]
                         )
@@ -212,15 +213,11 @@ class DecyrptoMatte:
         return id_mattes
 
     @staticmethod
-    def get_id_coverage_dict(pixel_values, ch_pair_idxs):
+    def _get_id_coverage_dict(pixel_values, ch_pair_idxs):
         return {
             pixel_values[x]: pixel_values[y]
             for x, y, in ch_pair_idxs if (x != 0.0 or y != 0.0)
             }
-
-    @staticmethod
-    def manifest_str_to_dict(mainfest_str: str) -> dict:
-        return json.loads(mainfest_str)
 
     @staticmethod
     def mm3hash_float(name) -> float:
@@ -243,10 +240,10 @@ class DecyrptoMatte:
         return "{0:08x}".format(struct.unpack('<I', struct.pack('<f', id_float))[0])
 
     @staticmethod
-    def id_to_rgb(id):
+    def id_to_rgb(id_float):
         """ This takes the hashed id and converts it to a preview color """
         import ctypes
-        bits = ctypes.cast(ctypes.pointer(ctypes.c_float(id)), ctypes.POINTER(ctypes.c_uint32)).contents.value
+        bits = ctypes.cast(ctypes.pointer(ctypes.c_float(id_float)), ctypes.POINTER(ctypes.c_uint32)).contents.value
 
         mask = 2 ** 32 - 1
         return [0.0, float((bits << 8) & mask) / float(mask), float((bits << 16) & mask) / float(mask)]
@@ -273,70 +270,3 @@ class DecyrptoMatte:
         return rgba
 
 
-class OpenImageUtil:
-    @classmethod
-    def premultiply_image(cls, img_pixels: np.array) -> np.array:
-        """ Premultiply a numpy image with itself """
-        a = cls.np_to_imagebuf(img_pixels)
-        ImageBufAlgo.premult(a, a)
-
-        return a.get_pixels(a.spec().format, a.spec().roi_full)
-
-    @staticmethod
-    def get_numpy_oiio_img_format(np_array: np.ndarray):
-        """ Returns either float or 8 bit integer format"""
-        img_format = oiio.FLOAT
-        if np_array.dtype != np.float32:
-            img_format = oiio.UINT8
-
-        return img_format
-
-    @classmethod
-    def np_to_imagebuf(cls, img_pixels: np.array):
-        """ Load a numpy array 8/32bit to oiio ImageBuf """
-        if len(img_pixels.shape) < 3:
-            LOGGER.error('Can not create image with Pixel data in this shape. Expecting 4 channels(RGBA).')
-            return
-
-        h, w, c = img_pixels.shape
-        img_spec = ImageSpec(w, h, c, cls.get_numpy_oiio_img_format(img_pixels))
-
-        img_buf = ImageBuf(img_spec)
-        img_buf.set_pixels(img_spec.roi_full, img_pixels)
-
-        return img_buf
-
-    @staticmethod
-    def read_image(img_file: Path, format: str=''):
-        img_input = oiio.ImageInput.open(img_file.as_posix())
-
-        if img_input is None:
-            LOGGER.error('Error reading image: %s', oiio.geterror())
-            return
-
-        img = img_input.read_image(format=format)
-        img_input.close()
-
-        return img
-
-    @classmethod
-    def write_image(cls, file: Path, pixels: np.array):
-        output = ImageOutput.create(file.as_posix())
-        if not output:
-            LOGGER.error('Error creating oiio image output:\n%s', oiio.geterror())
-            return
-
-        if len(pixels.shape) < 3:
-            LOGGER.error('Can not create image with Pixel data in this shape. Expecting 3 or 4 channels(RGB, RGBA).')
-            return
-
-        h, w, c = pixels.shape
-        spec = ImageSpec(w, h, c, cls.get_numpy_oiio_img_format(pixels))
-
-        result = output.open(file.as_posix(), spec)
-        if result:
-            output.write_image(pixels)
-        else:
-            LOGGER.error('Could not open image file for writing: %s: %s', file.name, output.geterror())
-
-        output.close()

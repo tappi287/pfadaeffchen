@@ -7,8 +7,8 @@ from threading import Thread
 
 import numpy as np
 
-from modules.decryptomatte import DecyrptoMatte, OpenImageUtil
-from modules.utils import create_file_safe_name
+from modules.decryptomatte import DecyrptoMatte
+from modules.utils import create_file_safe_name, OpenImageUtil
 
 logging.basicConfig(level=logging.DEBUG)
 LOGGER = logging.getLogger(__name__)

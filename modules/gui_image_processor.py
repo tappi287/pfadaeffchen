@@ -28,7 +28,7 @@ from pathlib import Path
 from PyQt5 import QtCore
 from subprocess import TimeoutExpired
 
-from modules.decryptomatte import DecyrptoMatte, OpenImageUtil
+from modules.decryptomatte import DecyrptoMatte
 from modules.detect_lang import get_translation
 from modules.setup_log import add_queue_handler, setup_logging, setup_queued_logger
 from modules.check_file_access import CheckFileAccess
@@ -36,7 +36,7 @@ from modules.app_globals import *
 from maya_mod.start_mayapy import run_module_in_standalone
 
 # translate strings
-from modules.utils import create_file_safe_name
+from modules.utils import create_file_safe_name, OpenImageUtil
 
 de = get_translation()
 _ = de.gettext
