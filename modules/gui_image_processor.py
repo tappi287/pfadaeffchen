@@ -698,7 +698,7 @@ class CreateCryptomattes:
         if beauty_f:
             beauty_img = self.img_util.read_image(beauty_f[0])
 
-        d = DecyrptoMatte(LOGGER, img_file)
+        d = DecyrptoMatte(LOGGER, img_file, alpha_over_compositing=True)
         layers = d.list_layers()
         id_mattes = d.get_mattes_by_names(layers)
 

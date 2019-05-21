@@ -20,12 +20,14 @@ class DecyrptoMatte:
     empty_pixel_threshold = 5  # Minimum number of opaque pixels a matte must contain
     empty_value_threshold = 0.2  # Minimum sum of all coverage values of all pixels
 
-    def __init__(self, logger, img_file: Path):
+    def __init__(self, logger, img_file: Path, alpha_over_compositing=False):
         global LOGGER
         LOGGER = logger
         if logger is None:
             logging.basicConfig(level=logging.DEBUG)
             LOGGER = logging.getLogger(__name__)
+
+        self.alpha_over_compositing = alpha_over_compositing
 
         self.img_file = img_file
         self.img = ImageBuf(img_file.as_posix())
@@ -181,18 +183,19 @@ class DecyrptoMatte:
                         img_nested_md[cryp_key]["ch_pair_idxs"]
                         )
 
-                    """
-                    # Full coverage per Pixel, if eg. 2 IDs are contributing so that mask is fully opaque
+                    high_rank_id, coverage_sum = 0.0, 0.0
 
-                    pixel_id_coverage = 0.0  # Coverage from -any- ID
-                    for id_val, coverage in result_id_cov.items():
-                        if id_val in id_mattes:
-                            pixel_id_coverage += coverage
-                    """
                     for id_val, coverage in result_id_cov.items():
                         if id_val in id_mattes:
                             # Sum coverage per id
                             id_mattes[id_val][y][x] += coverage
+                            coverage_sum += coverage
+                            if not high_rank_id:
+                                high_rank_id = id_val
+
+                    if self.alpha_over_compositing and high_rank_id:
+                        if id_mattes[high_rank_id][y][x] != coverage_sum:
+                            id_mattes[high_rank_id][y][x] = 1.0
 
             if not y % 200:
                 LOGGER.debug('Iterating pixel row %s of %s', y, h)
