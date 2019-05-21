@@ -19,7 +19,7 @@ class MergeLayerByName:
     def __init__(self, layer_names: List[str], scene_file: Path):
         self.layer_names = layer_names
         self.scene_file = Path(scene_file)
-        self.pos_file = scene_file.with_suffix('.pos')
+        self.pos_file = self.scene_file.with_suffix('.pos')
 
     def create_layer_mapping(self) -> dict:
         if not self.pos_file.exists():

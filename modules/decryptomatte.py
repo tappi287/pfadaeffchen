@@ -1,15 +1,22 @@
 import json
+import time
 import logging
 import mmh3
 import os
 import struct
+from queue import Queue
+from threading import Thread
+
+import numpy as np
 
 import OpenImageIO as oiio
 from OpenImageIO import ImageBuf
 from pathlib import Path
 from typing import List
 
-import numpy as np
+from modules.app_globals import ImgParams
+from modules.merge_layers import MergeLayerByName
+from modules.utils import OpenImageUtil, create_file_safe_name
 
 
 class DecyrptoMatte:
@@ -167,14 +174,32 @@ class DecyrptoMatte:
             return dict()
 
         img_nested_md = self.sorted_crypto_metadata()
-        result_pixel, result_id_cov = None, None
 
-        # Create dictionary that will store the coverage matte arrays per id
         w, h = self.img.spec().width, self.img.spec().height
-        id_mattes = {id_val: np.zeros((h, w), dtype=np.float32) for id_val in target_ids}
 
-        for y in range(0, h):
-            for x in range(0, w):
+        start = time.time()
+        id_mattes = self._iterate_image(0, 0, w, h, img_nested_md, target_ids)
+
+        # Purge mattes below threshold value
+        for id_val in target_ids:
+            v, p = id_mattes[id_val].max(), id_mattes[id_val].any(axis=-1).sum()
+
+            if v < self.empty_value_threshold and p < self.empty_pixel_threshold:
+                LOGGER.debug('Purging empty coverage matte: %s %s', v, p)
+                id_mattes.pop(id_val)
+
+        # --- DEBUG info ---
+        LOGGER.debug(f'Iterated image : {w:04d}x{h:04d} - with {len(target_ids)} ids.')
+        LOGGER.debug(f'Id Matte extraction finished in {time.time() - start:.4f}s')
+
+        return id_mattes
+
+    def _iterate_image(self, start_x: int, start_y: int, width: int, height: int,
+                       img_nested_md: dict, target_ids: list):
+        id_mattes = {id_val: np.zeros((height, width), dtype=np.float32) for id_val in target_ids}
+
+        for y in range(start_y, start_y + height):
+            for x in range(start_x, start_x + width):
                 result_pixel = self.img.getpixel(x, y)
 
                 for cryp_key in img_nested_md:
@@ -189,29 +214,23 @@ class DecyrptoMatte:
                         if id_val in id_mattes:
                             # Sum coverage per id
                             id_mattes[id_val][y][x] += coverage
+                            # Sum overall coverage for this pixel of all ids
                             coverage_sum += coverage
+
                             if not high_rank_id:
+                                # Store the id with the highest rank
+                                # for this pixel (first entry in result_id_cov)
                                 high_rank_id = id_val
 
+                    # Highest ranked Id will be set fully opaque for the whole pixel
+                    # if multiple Ids are contributing to this pixel
+                    # getting matte ready for alpha over operations eg. Photoshop
                     if self.alpha_over_compositing and high_rank_id:
                         if id_mattes[high_rank_id][y][x] != coverage_sum:
-                            id_mattes[high_rank_id][y][x] = 1.0
+                            id_mattes[high_rank_id][y][x] = coverage_sum
 
-            if not y % 200:
-                LOGGER.debug('Iterating pixel row %s of %s', y, h)
-
-        del result_id_cov, result_pixel
-
-        # Purge mattes below threshold value
-        for id_val in target_ids:
-            v, p = id_mattes[id_val].max(), id_mattes[id_val].any(axis=-1).sum()
-
-            if v < self.empty_value_threshold and p < self.empty_pixel_threshold:
-                LOGGER.debug('Purging empty coverage matte: %s %s', v, p)
-                id_mattes.pop(id_val)
-
-        # --- DEBUG info ---
-        LOGGER.debug(f'Iterated image : {w:04d}x{h:04d} - with {len(target_ids)} ids.')
+            if not y % 256:
+                LOGGER.debug('Reading cryptomatte at vline: %s (%sx%s)', y, width, height)
 
         return id_mattes
 
@@ -273,3 +292,96 @@ class DecyrptoMatte:
         return rgba
 
 
+class CreateCryptomattes:
+    def __init__(self, output_dir: Path, scene_file: Path, logger=None):
+        """
+        Search for beauty and cryptomatte aov file output and create image file per id layer
+
+        :param output_dir:
+        :param scene_file:
+        :param logger:
+        """
+        self.img_util = OpenImageUtil()
+        self.output_dir = output_dir
+        self.scene = scene_file
+        self.cryptomatte_dir_name = ImgParams.cryptomatte_dir_name
+        self.cryptomatte_out_file_ext = ImgParams.cryptomatte_out_file_ext
+
+        if logger:
+            global LOGGER
+            LOGGER = logger
+
+    def _find_files(self):
+        beauty_img = None
+
+        img_file = [i for i in Path(self.output_dir / self.cryptomatte_dir_name).glob(
+                    f'*.{ImgParams.extension_arnold}') if i.exists()]
+        beauty_f = [i for i in Path(self.output_dir / 'beauty').glob(
+                    f'*.{ImgParams.extension_arnold}') if i.exists()]
+
+        # Check that cryptomatte aov exr exists
+        if img_file:
+            img_file = img_file[0]
+
+        # Use beauty render if available
+        if beauty_f:
+            beauty_img = self.img_util.read_image(beauty_f[0])
+
+        return img_file, beauty_img
+
+    def create_cryptomattes(self):
+        """ Extract cryptomattes to files and return image_file_watcher dict """
+        img_file_dict, beauty_img = dict(), None
+        img_file, beauty_img = self._find_files()
+        if not img_file:
+            return img_file_dict, img_file_dict
+
+        # Decrypt all Cryptomatte id layers to a layer_name/matte pair
+        d = DecyrptoMatte(LOGGER, img_file)
+        layers = d.list_layers()
+        id_mattes = d.get_mattes_by_names(layers)
+
+        # Prepare merging of layers target->source looks(DeltaGen specific)
+        output_mattes = dict()
+        layer_re_mappping = MergeLayerByName(layers, self.scene).create_layer_mapping()
+
+        # ---
+        # --- Merge target look IDs if DeltaGen POS file found ---
+        for layer_name, id_matte in id_mattes.items():
+            # eg. leather_black = t_seat_a
+            layer_remap = layer_re_mappping.get(layer_name)
+
+            if layer_remap:
+                if layer_remap not in output_mattes:
+                    # Create matte entry for eg. leather_black
+                    output_mattes[layer_remap] = id_matte
+                else:
+                    # Merge with existing id matte eg. t_seat_a + t_seat_b
+                    output_mattes[layer_remap] += id_matte
+            else:
+                # No remap necessary
+                output_mattes[layer_name] = id_matte
+
+        # ---
+        # --- Write the mattes to disk ---
+        for layer_name, id_matte in output_mattes.items():
+            # Combine beauty and coverage matte
+            rgba_matte = d.merge_matte_and_rgb(id_matte, beauty_img)
+
+            # Pre-multiply RGBA matte
+            rgba_matte = self.img_util.premultiply_image(rgba_matte)
+            matte_img_file = self.output_dir / f'{create_file_safe_name(layer_name)}.{self.cryptomatte_out_file_ext}'
+
+            # Create image file dict entry
+            img_file_dict.update({matte_img_file.stem: dict(path=matte_img_file, processed=True)})
+            # Create image
+            self.img_util.write_image(matte_img_file, rgba_matte)
+
+        # CleanUp
+        d.shutdown()
+        try:
+            del d
+        except Exception as e:
+            LOGGER.error(e)
+
+        return img_file_dict, img_file_dict

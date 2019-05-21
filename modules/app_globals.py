@@ -83,6 +83,9 @@ class ImgParams:
     res_y = 2160
     maya_detection_format = 'iff'
 
+    cryptomatte_dir_name = 'crypto_material'
+    cryptomatte_out_file_ext = 'iff'
+
 
 UI_FILE_MAIN = 'res/Pfad_Aeffchen.ui'
 UI_FILE_SUB = 'res/Renderprozess_Depp.ui'

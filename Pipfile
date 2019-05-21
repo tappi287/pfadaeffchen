@@ -14,6 +14,7 @@ openimageio = {file = "https://piwigo.ilikeviecher.com/ftp-upload/packages/OpenI
 mmh3 = "==2.5.1"
 pynsist = "*"
 lxml = "*"
+cython = "*"
 
 [dev-packages]
 

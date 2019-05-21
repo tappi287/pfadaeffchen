@@ -23,21 +23,19 @@ import os
 import shutil
 import numpy as np
 from PIL import Image
-from time import sleep, time
+from time import sleep
 from pathlib import Path
 from PyQt5 import QtCore
 from subprocess import TimeoutExpired
 
-from modules.decryptomatte import DecyrptoMatte
+from modules.decryptomatte import CreateCryptomattes
 from modules.detect_lang import get_translation
-from modules.merge_layers import MergeLayerByName
-from modules.setup_log import add_queue_handler, setup_logging, setup_queued_logger
+from modules.setup_log import setup_queued_logger
 from modules.check_file_access import CheckFileAccess
 from modules.app_globals import *
 from maya_mod.start_mayapy import run_module_in_standalone
 
 # translate strings
-from modules.utils import create_file_safe_name, OpenImageUtil
 
 de = get_translation()
 _ = de.gettext
@@ -131,8 +129,6 @@ class ImageFileWatcher(QtCore.QThread):
 
     # Scan interval in milliseconds
     interval = 15000
-    cryptomatte_dir_name = 'crypto_material'
-    cryptomatte_out_file_ext = 'iff'
 
     # Thread Pool
     # increase thread timeout to 4 mins
@@ -305,9 +301,8 @@ class ImageFileWatcher(QtCore.QThread):
         self.report_changes(img_dict)
 
         # Watch for arnold render results
-        if (self.output_dir / self.cryptomatte_dir_name).exists() or (self.output_dir / 'beauty').exists():
+        if (self.output_dir / ImgParams.cryptomatte_dir_name).exists() or (self.output_dir / 'beauty').exists():
             self.is_arnold = True
-            # self.file_created_signal.emit(set(), 2)
 
         self.watcher_img_dict = img_dict
 
@@ -355,7 +350,7 @@ class ImageFileWatcher(QtCore.QThread):
             self.status_signal.emit(_('Cryptomatten werden erstellt.'))
             # self.file_created_signal.emit(set(), 3)
 
-            c = CreateCryptomattes(self.output_dir, self.scene_file)
+            c = CreateCryptomattes(self.output_dir, self.scene_file, LOGGER)
             self.watcher_img_dict, self.processed_img_dict = c.create_cryptomattes()
 
         if not len(self.watcher_img_dict):
@@ -401,7 +396,7 @@ class ImageFileWatcher(QtCore.QThread):
             LOGGER.debug('Starting PSD Thread: %s %s %s', psd_file, self.output_dir, self.mod_dir)
 
             if self.is_arnold:
-                file_ext = self.cryptomatte_out_file_ext
+                file_ext = ImgParams.cryptomatte_out_file_ext
             else:
                 file_ext = ImgParams.extension
 
@@ -424,7 +419,7 @@ class ImageFileWatcher(QtCore.QThread):
         if self.is_arnold:
             try:
                 shutil.rmtree(Path(self.output_dir / 'beauty').as_posix(), ignore_errors=True)
-                shutil.rmtree(Path(self.output_dir / self.cryptomatte_dir_name).as_posix(), ignore_errors=True)
+                shutil.rmtree(Path(self.output_dir / ImgParams.cryptomatte_dir_name).as_posix(), ignore_errors=True)
             except Exception as e:
                 LOGGER.error('Error removing arnold render results: %s', e)
 
@@ -676,76 +671,6 @@ class ProcessImage(QtCore.QRunnable):
             except Exception as e:
                 LOGGER.error('Killing the Image content detection process failed!')
                 LOGGER.error(e)
-
-
-class CreateCryptomattes:
-    def __init__(self, output_dir: Path, scene_file: Path):
-        self.img_util = OpenImageUtil()
-        self.output_dir = output_dir
-        self.scene = scene_file
-        self.cryptomatte_dir_name = ImageFileWatcher.cryptomatte_dir_name
-        self.cryptomatte_out_file_ext = ImageFileWatcher.cryptomatte_out_file_ext
-
-    def create_cryptomattes(self):
-        """ Extract cryptomattes to files and return image_file_watcher dict """
-        img_file_dict, beauty_img = dict(), None
-        img_file = [i for i in Path(self.output_dir / self.cryptomatte_dir_name).glob('*.exr') if i.exists()]
-        beauty_f = [i for i in Path(self.output_dir / 'beauty').glob('*.exr') if i.exists()]
-
-        # Check that cryptomatte aov exr exists
-        if img_file:
-            img_file = img_file[0]
-        else:
-            return img_file_dict, img_file_dict
-
-        # Use beauty render if available
-        if beauty_f:
-            beauty_img = self.img_util.read_image(beauty_f[0])
-
-        d = DecyrptoMatte(LOGGER, img_file)
-        layers = d.list_layers()
-        id_mattes = d.get_mattes_by_names(layers)
-
-        output_mattes = dict()
-        layer_re_mappping = MergeLayerByName(layers, self.scene).create_layer_mapping()
-
-        # --- Merge target look IDs if DeltaGen POS file found ---
-        for layer_name, id_matte in id_mattes.items():
-            # eg. leather_black = t_seat_a
-            layer_remap = layer_re_mappping.get(layer_name)
-
-            if layer_remap:
-                if layer_remap not in output_mattes:
-                    # Create matte entry for eg. leather_black
-                    output_mattes[layer_remap] = id_matte
-                else:
-                    # Merge with existing id matte eg. t_seat_a + t_seat_b
-                    output_mattes[layer_remap] += id_matte
-            else:
-                # No remap necessary
-                output_mattes[layer_name] = id_matte
-
-        # --- Write the mattes to disk ---
-        for layer_name, id_matte in output_mattes.items():
-            # Combine beauty and coverage matte
-            rgba_matte = d.merge_matte_and_rgb(id_matte, beauty_img)
-            # Premultiply rgba matte
-            rgba_matte = self.img_util.premultiply_image(rgba_matte)
-            matte_img_file = self.output_dir / f'{create_file_safe_name(layer_name)}.{self.cryptomatte_out_file_ext}'
-
-            # Create image file dict entry
-            img_file_dict.update({matte_img_file.stem: dict(path=matte_img_file, processed=True)})
-            # Create image
-            self.img_util.write_image(matte_img_file, rgba_matte)
-
-        # CleanUp
-        d.shutdown()
-        try:
-            del d
-        except Exception as e:
-            LOGGER.error(e)
-
-        return img_file_dict, img_file_dict
 
 
 class CreatePSDFileSignals(QtCore.QObject):

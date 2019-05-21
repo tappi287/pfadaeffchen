@@ -6,7 +6,7 @@
     <ProjectGuid>{bc03a7b5-4e9f-42eb-b492-3ccd8f50814e}</ProjectGuid>
     <ProjectHome />
     <StartupFile>pfad_aeffchen.py</StartupFile>
-    <SearchPath>C:\\Users\\CADuser\\PycharmProjects\\pfadaeffchen;</SearchPath>
+    <SearchPath>C:\\Users\\CADuser\\PycharmProjects\\pfadaeffchen</SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
     <OutputPath>.</OutputPath>
     <ProjectTypeGuids>{888888a0-9f3d-457c-b088-3a5042f75d52}</ProjectTypeGuids>
