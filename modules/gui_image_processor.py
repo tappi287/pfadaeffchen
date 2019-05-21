@@ -30,6 +30,7 @@ from subprocess import TimeoutExpired
 
 from modules.decryptomatte import DecyrptoMatte
 from modules.detect_lang import get_translation
+from modules.merge_layers import MergeLayerByName
 from modules.setup_log import add_queue_handler, setup_logging, setup_queued_logger
 from modules.check_file_access import CheckFileAccess
 from modules.app_globals import *
@@ -166,6 +167,7 @@ class ImageFileWatcher(QtCore.QThread):
 
         if scene_file:
             self.scene_file_name = Path(scene_file).stem
+        self.scene_file = scene_file
 
         self.mod_dir = mod_dir
         self.parent = parent
@@ -353,7 +355,7 @@ class ImageFileWatcher(QtCore.QThread):
             self.status_signal.emit(_('Cryptomatten werden erstellt.'))
             # self.file_created_signal.emit(set(), 3)
 
-            c = CreateCryptomattes(self.output_dir)
+            c = CreateCryptomattes(self.output_dir, self.scene_file)
             self.watcher_img_dict, self.processed_img_dict = c.create_cryptomattes()
 
         if not len(self.watcher_img_dict):
@@ -451,6 +453,7 @@ class ImageFileWatcher(QtCore.QThread):
 
     def change_scene_file(self, file):
         self.scene_file_name = Path(file).stem
+        self.scene_file = file
         self.status_signal.emit(_('Szenendatei geändert zu: {}').format(self.scene_file_name))
 
     def report_changes(self, current_img_dict):
@@ -676,9 +679,10 @@ class ProcessImage(QtCore.QRunnable):
 
 
 class CreateCryptomattes:
-    def __init__(self, output_dir: Path):
+    def __init__(self, output_dir: Path, scene_file: Path):
         self.img_util = OpenImageUtil()
         self.output_dir = output_dir
+        self.scene = scene_file
         self.cryptomatte_dir_name = ImageFileWatcher.cryptomatte_dir_name
         self.cryptomatte_out_file_ext = ImageFileWatcher.cryptomatte_out_file_ext
 
@@ -702,10 +706,29 @@ class CreateCryptomattes:
         layers = d.list_layers()
         id_mattes = d.get_mattes_by_names(layers)
 
+        output_mattes = dict()
+        layer_re_mappping = MergeLayerByName(layers, self.scene).create_layer_mapping()
+
+        # --- Merge target look IDs if DeltaGen POS file found ---
         for layer_name, id_matte in id_mattes.items():
+            # eg. leather_black = t_seat_a
+            layer_remap = layer_re_mappping.get(layer_name)
+
+            if layer_remap:
+                if layer_remap not in output_mattes:
+                    # Create matte entry for eg. leather_black
+                    output_mattes[layer_remap] = id_matte
+                else:
+                    # Merge with existing id matte eg. t_seat_a + t_seat_b
+                    output_mattes[layer_remap] += id_matte
+            else:
+                # No remap necessary
+                output_mattes[layer_name] = id_matte
+
+        # --- Write the mattes to disk ---
+        for layer_name, id_matte in output_mattes.items():
             # Combine beauty and coverage matte
             rgba_matte = d.merge_matte_and_rgb(id_matte, beauty_img)
-
             # Premultiply rgba matte
             rgba_matte = self.img_util.premultiply_image(rgba_matte)
             matte_img_file = self.output_dir / f'{create_file_safe_name(layer_name)}.{self.cryptomatte_out_file_ext}'
