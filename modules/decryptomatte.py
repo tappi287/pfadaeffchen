@@ -4,8 +4,6 @@ import logging
 import mmh3
 import os
 import struct
-from queue import Queue
-from threading import Thread
 
 import numpy as np
 
@@ -15,8 +13,7 @@ from pathlib import Path
 from typing import List
 
 from modules.app_globals import ImgParams
-from modules.merge_layers import MergeLayerByName
-from modules.utils import OpenImageUtil, create_file_safe_name
+from modules.utils import OpenImageUtil, create_file_safe_name, MergeLayerByName
 
 
 class DecyrptoMatte:
