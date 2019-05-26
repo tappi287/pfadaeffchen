@@ -28,7 +28,7 @@ from pathlib import Path
 from PyQt5 import QtCore
 from subprocess import TimeoutExpired
 
-from modules.decryptomatte import CreateCryptomattes
+from modules.create_cryptomatte import CreateCryptomattes
 from modules.detect_lang import get_translation
 from modules.setup_log import setup_queued_logger
 from modules.check_file_access import CheckFileAccess

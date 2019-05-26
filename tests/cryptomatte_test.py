@@ -1,8 +1,10 @@
 import logging
+import time
 from pathlib import Path
 
 from maya_mod.start_mayapy import run_module_in_standalone
-from modules.decryptomatte import DecyrptoMatte, CreateCryptomattes
+from modules.decryptomatte import DecyrptoMatte
+from modules.create_cryptomatte import CreateCryptomattes
 from modules.setup_paths import get_current_modules_dir
 from modules.utils import OpenImageUtil, create_file_safe_name
 
@@ -18,6 +20,7 @@ def alpha_over(a: float, b: float):
 
 
 def main():
+    start_time = time.time()
     output_dir = Path(r'I:\Nextcloud\py\maya_scripts\_test_scene\render_output\AU32X_Q3_1558453812_4317')
     scene = Path(r'I:\Nextcloud\py\maya_scripts\_test_scene\render_output\AU32X_Q3_1558453812_4317\AU32X_Q3SB_2020_01_NG_F_07_20190423_Poly_EXT_sta.csb')
     mod_dir = get_current_modules_dir()
@@ -35,6 +38,8 @@ def main():
         process.wait()
     except Exception as e:
         LOGGER.error(e)
+
+    LOGGER.info(f'Finished in {time.time() - start_time:.4f}s')
 
 
 def main_old():
