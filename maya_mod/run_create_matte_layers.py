@@ -92,20 +92,22 @@ def main():
             send_message('Erstelle Ausgabe Verzeichnis:<i>' + os.path.split(img_path)[-1] + '</i>')
         except Exception as e:
             LOGGER.error(e)
+            send_message('Konnte Ausgabeverzeichnis nicht erstelllen/zugreifen.')
+            sys.exit(1)
 
     # --- Prepare CSB import
     if scene_ext.capitalize() == '.csb':
         if not load_csb_plugin(args.version):
             LOGGER.fatal('Could not load rttDirectMayaPlugIn. Can not import CSB files. Aborting batch process.')
             send_message('Konnte rttDirectMayaPlugIn nicht laden. Vorgang abgebrochen.')
-            return
+            sys.exit(2)
 
     # --- Prepare Arnold Renderer PlugIn
     if args.renderer == 'arnold':
         if not load_mtoa_plugin():
             LOGGER.fatal('Could not load mtoa. Can not render using arnold. Aborting batch process.')
             send_message('Konnte Arnold Renderer nicht laden. Vorgang abgebrochen.')
-            return
+            sys.exit(3)
 
     # Open or import file
     if scene_ext.capitalize() == '.csb':
@@ -123,7 +125,7 @@ def main():
     if not mu.get_camera_by_name('Camera'):
         send_message('Keine renderbare Kamera - "Camera" gefunden! Vorgang abgebrochen.')
         LOGGER.fatal('Renderable Camera with exact name "Camera" could not be found. Aborting layer creation.')
-        return
+        sys.exit(4)
 
     # Setup scene with foreground matte layers per material
     send_message('Erstelle render layer setup.')
