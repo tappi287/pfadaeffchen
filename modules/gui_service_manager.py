@@ -253,7 +253,11 @@ class ServiceManager(QThread):
         if not len(job_data) > 2:
             return False
 
-        job_item = Job(*job_data)
+        try:
+            job_item = Job(*job_data)
+        except Exception as e:
+            LOGGER.error('Error creating job from socket stream: %s %s', job_data, e)
+            return False
 
         if not job_item.file or not job_item.render_dir:
             return False
@@ -401,7 +405,7 @@ class ServiceManager(QThread):
             except ValueError:
                 version = 0
 
-            if version:
+            if version and version > 1:
                 LOGGER.info('Client with version %s connected.', version)
                 response = _('Render Dienst verfuegbar @ {} '
                              'Maya Version: {}').format(self.hostname, self.ui.comboBox_version.currentText())

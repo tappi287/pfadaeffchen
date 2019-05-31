@@ -49,6 +49,7 @@ parser.add_argument('version', help='String value 2016.5 or 2017', type=str)
 parser.add_argument('renderer', help='String value eg. mayaHardware2', type=str)
 parser.add_argument('csb_ignore_hidden', help='Boolean as integer 1 or 0', type=int)
 parser.add_argument('maya_delete_hidden', help='Boolean as integer 1 or 0', type=int)
+parser.add_argument('use_scene_settings', help='Boolean as integer 1 or 0', type=int)
 
 # Parse command line arguments
 args = parser.parse_args()
@@ -122,7 +123,7 @@ def main():
         mfu.open_file(args.file_path)
 
     # Check for DeltaGen camera "Camera"
-    if not mu.get_camera_by_name('Camera'):
+    if not mu.get_camera_by_name('Camera') and not args.use_scene_settings:
         send_message('Keine renderbare Kamera - "Camera" gefunden! Vorgang abgebrochen.')
         LOGGER.fatal('Renderable Camera with exact name "Camera" could not be found. Aborting layer creation.')
         sys.exit(4)
@@ -131,13 +132,17 @@ def main():
     send_message('Erstelle render layer setup.')
     send_message('COMMAND STATUS_NAME Erstelle Render-Layer Setup')
     num_layers = maya_matte_layers.create(maya_delete_hidden=args.maya_delete_hidden,
-                                          renderer=args.renderer)
+                                          renderer=args.renderer, use_scene_settings=args.use_scene_settings)
     send_message('{:04d} Layer erstellt.'.format(num_layers))
     send_message('COMMAND LAYER_NUM {:04d}'.format(num_layers))
 
     # Setup render settings
     send_message('Setze ' + args.renderer + ' Einstellungen.')
-    maya_render_settings.setup_render_settings('Camera', img_path, args.env, args.renderer)
+    if not args.use_scene_settings:
+        maya_render_settings.setup_render_settings('Camera', img_path, args.env, args.renderer)
+    if args.use_scene_settings and args.renderer == 'arnold':
+        # Make sure scene arnold settings have log level set to info
+        maya_render_settings.setup_minimal_mtoa()
 
     # Save the scene
     mfu.save_file(render_scene_file)

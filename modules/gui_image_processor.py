@@ -346,12 +346,17 @@ class ImageFileWatcher(QtCore.QThread):
             LOGGER.debug('Can not create PSD yet. Image detection threads active. Retrying on next directory index.')
             return
 
+        # Default resolution values
+        # will be overriden if cryptomatte and use_scene_settings active
+        img_resolution = (ImgParams.res_x, ImgParams.res_y)
+
         if self.is_arnold:
             self.status_signal.emit(_('Cryptomatten werden erstellt.'))
             # self.file_created_signal.emit(set(), 3)
 
             c = CreateCryptomattes(self.output_dir, self.scene_file, LOGGER)
             self.watcher_img_dict, self.processed_img_dict = c.create_cryptomattes()
+            img_resolution = (c.res_x, c.res_y)
 
         if not len(self.watcher_img_dict):
             # No images to create PSD from, set Job as failed
@@ -402,7 +407,7 @@ class ImageFileWatcher(QtCore.QThread):
 
             create_psd_runner = CreatePSDFile(
                 psd_file, self.output_dir, self.mod_dir, self.thread_status, self.psd_created,
-                file_ext_override=file_ext
+                file_ext_override=file_ext, img_resolution=img_resolution
                 )
 
             self.thread_pool.start(create_psd_runner)
@@ -680,12 +685,14 @@ class CreatePSDFileSignals(QtCore.QObject):
 
 class CreatePSDFile(QtCore.QRunnable):
 
-    def __init__(self, psd_file, img_dir, mod_dir, status_callback, result_callback, file_ext_override=''):
+    def __init__(self, psd_file, img_dir, mod_dir, status_callback, result_callback,
+                 file_ext_override='', img_resolution=(0, 0)):
         super(CreatePSDFile, self).__init__()
         self.psd_file, self.img_dir, self.mod_dir = psd_file, img_dir, mod_dir
         self.psd_creation_module = Path(self.mod_dir) / 'maya_mod/run_create_psd.py'
 
         self.file_extension = file_ext_override or ImgParams.extension
+        self.img_res = (str(img_resolution[0]), str(img_resolution[1]))
 
         self.signals = CreatePSDFileSignals()
         self.signals.result.connect(result_callback)
@@ -696,7 +703,7 @@ class CreatePSDFile(QtCore.QRunnable):
             self.signals.status.emit(_('Erstelle PSD Datei {}').format(self.psd_file.name))
             process = run_module_in_standalone(
                 self.psd_creation_module.as_posix(),  # Path to module to run
-                self.psd_file.as_posix(), self.img_dir.as_posix(), self.file_extension,  # Args
+                self.psd_file.as_posix(), self.img_dir.as_posix(), self.file_extension, *self.img_res,  # Args
                 Path(self.mod_dir).as_posix()  # Environment dir
                 )
             process.wait()

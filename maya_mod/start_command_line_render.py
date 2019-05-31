@@ -65,8 +65,14 @@ def run_command_line_render(my_file, out_dir, res_x, res_y, version, logger, ima
 
     img_name = '-im "<RenderLayer>" '
     out_dir = '-rd "' + out_dir + '" '
-    res_x = '-x ' + str(res_x) + ' '
-    res_y = '-y ' + str(res_y) + ' '
+
+    if res_x and res_y:
+        # Add resolution args if provided
+        res_x = '-x ' + str(res_x) + ' '
+        res_y = '-y ' + str(res_y) + ' '
+    else:
+        res_x, res_y = '', ''
+
     my_file = '"' + os.path.abspath(my_file) + '"'
     image_format = '-of ' + image_format + ' '
 

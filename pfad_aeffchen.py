@@ -149,12 +149,14 @@ class PfadAeffchenApp(QtWidgets.QApplication):
         self.ui.sceneFileBtn.pressed.connect(self.open_file_dialog)
         self.ui.checkBoxCsbIgnoreHidden.toggled.connect(self.set_csb_import_hidden)
         self.ui.checkBoxMayaDeleteHidden.toggled.connect(self.set_maya_delete_hidden)
+        self.ui.checkBoxSceneSettings.toggled.connect(self.set_use_scene_settings)
 
         # Local job GUI propertys
         self.scene_file = None
         self.render_path = None
         self.csb_ignore_hidden = '1'
         self.maya_delete_hidden = '1'
+        self.use_scene_settings = '0'
         self.scene_file_changed.connect(self.set_scene_file)
         self.render_path_changed.connect(self.set_render_path)
 
@@ -196,6 +198,14 @@ class PfadAeffchenApp(QtWidgets.QApplication):
 
         LOGGER.info('Local Job Option Maya delete hidden objects: maya_delete_hidden=%s', self.maya_delete_hidden)
 
+    def set_use_scene_settings(self, use_scene_settings):
+        if use_scene_settings:
+            self.use_scene_settings = '1'
+        else:
+            self.use_scene_settings = '0'
+
+        LOGGER.info('Local Job Option Use Scene Settings: use_scene_settings=%s', self.use_scene_settings)
+
     def set_scene_file(self, file_path):
         """ Set scene file in GUI for local job """
         if not file_path:
@@ -224,7 +234,7 @@ class PfadAeffchenApp(QtWidgets.QApplication):
         job_title = _('Lokaler Job')
         renderer = self.ui.comboBox_renderer.currentText()
         job_data = (job_title, self.scene_file, self.render_path, renderer,
-                    self.csb_ignore_hidden, self.maya_delete_hidden)
+                    self.csb_ignore_hidden, self.maya_delete_hidden, self.use_scene_settings)
 
         self.control_app.add_job_signal.emit(job_data)
 

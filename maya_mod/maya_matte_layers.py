@@ -173,7 +173,7 @@ class MayaMatteLayer(object):
         return __ovr
 
 
-def create(maya_delete_hidden=1, renderer='mayaSoftware'):
+def create(maya_delete_hidden=1, renderer='mayaSoftware', use_scene_settings=0):
     # Delete all hidden objects
     try:
         if maya_delete_hidden:
@@ -189,12 +189,14 @@ def create(maya_delete_hidden=1, renderer='mayaSoftware'):
 
     # Delete all lights
     try:
-        maya_delete.all_lights()
+        if not use_scene_settings:
+            maya_delete.all_lights()
     except Exception as e:
         LOGGER.error(e)
 
     if renderer == 'arnold':
-        maya_tappitilitys.create_arnold_default_light()
+        if not use_scene_settings:
+            maya_tappitilitys.create_arnold_default_light()
 
         # Make sure shadingGroups contain only ASCII characters
         # otherwise AOV creation may fail

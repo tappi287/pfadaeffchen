@@ -34,7 +34,7 @@ class Job(object):
     button_txt = _('Ausführen')
 
     def __init__(self, job_title, scene_file, render_dir, renderer,
-                 ignore_hidden_objects='1', maya_delete_hidden='1',
+                 ignore_hidden_objects='1', maya_delete_hidden='1', use_scene_settings='0',
                  client='Server'):
         self.title = job_title
         self.file = scene_file
@@ -46,6 +46,9 @@ class Job(object):
 
         # Maya Layer Creation process optional argument
         self.maya_delete_hidden = maya_delete_hidden
+
+        # Use render settings of the maya binary scene instead of creating
+        self.use_scene_settings = use_scene_settings
 
         # Class version
         self.version = 1
@@ -145,6 +148,10 @@ class Job(object):
         if self.status == 2:
             if self.img_num and self.total_img_num:
                 self.status_name = _('{0:03d}/{1:03d} Layer erstellt').format(self.img_num, self.total_img_num)
+
+                if self.renderer == 'arnold':
+                    percent = min(100, max(0, self.img_num - 1) * 10)
+                    self.status_name = f'Rendering {int(percent):02d}%'
 
         value = 0
 

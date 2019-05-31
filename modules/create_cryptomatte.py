@@ -20,6 +20,8 @@ class CreateCryptomattes:
         self.cryptomatte_dir_name = ImgParams.cryptomatte_dir_name
         self.cryptomatte_out_file_ext = ImgParams.cryptomatte_out_file_ext
 
+        self.res_x, self.res_y = 0, 0
+
         if logger:
             global LOGGER
             LOGGER = logger
@@ -35,6 +37,7 @@ class CreateCryptomattes:
         # Check that cryptomatte aov exr exists
         if img_file:
             img_file = img_file[0]
+            self.res_x, self.res_y = self.img_util.get_image_resolution(img_file)
 
         # Use beauty render if available
         if beauty_f:

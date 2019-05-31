@@ -65,7 +65,8 @@ class RunLayerCreationProcess(threading.Thread):
                  # Logging instance
                  main_logger,
                  # Process Arguments
-                 scene_file, render_path, module_dir=None, ignore_hidden='1', delete_hidden='1',
+                 scene_file, render_path, module_dir=None,
+                 ignore_hidden='1', delete_hidden='1', use_scene_settings='0',
                  version=None, use_renderer='',
                  # Callbacks
                  callback=None, failed_callback=None, status_callback=None):
@@ -76,7 +77,7 @@ class RunLayerCreationProcess(threading.Thread):
         self.scene_file, self.render_path = scene_file, render_path
         self.module_dir, self.version = module_dir, version
         self.renderer, self.ignoreHidden = use_renderer, ignore_hidden
-        self.delete_hidden = delete_hidden
+        self.delete_hidden, self.use_scene_settings = delete_hidden, use_scene_settings
 
         # Prepare signals
         self.signals = RunLayerCreationSignals()
@@ -149,10 +150,11 @@ class RunLayerCreationProcess(threading.Thread):
         module_file = os.path.join(self.module_dir, 'maya_mod/run_create_matte_layers.py')
         module_file = os.path.abspath(module_file)
 
-        LOGGER.info('Starting maya standalone with: %s\n%s, %s, %s, %s, %s, %s, %s, pipe_output=%s',
+        LOGGER.info('Starting maya standalone with: %s\n%s, %s, %s, %s, %s, %s, %s, %s pipe_output=%s',
                     os.path.basename(module_file),
                     self.scene_file, self.render_path, self.module_dir,
-                    self.version, self.renderer, self.ignoreHidden, self.delete_hidden, True)
+                    self.version, self.renderer,
+                    self.ignoreHidden, self.delete_hidden, self.use_scene_settings, True)
 
         # Start process
         try:
@@ -160,7 +162,7 @@ class RunLayerCreationProcess(threading.Thread):
                 module_file,
                 # Additional arguments for run_create_matte_layers.py:
                 self.scene_file, self.render_path, self.module_dir, self.version, self.renderer,
-                self.ignoreHidden, self.delete_hidden,
+                self.ignoreHidden, self.delete_hidden, self.use_scene_settings,
                 pipe_output=True,     # Return a process that has output set to PIPE
                 version=self.version  # mayapy version to use
                 )
@@ -195,9 +197,13 @@ class RunLayerCreationProcess(threading.Thread):
         else:
             img_ext = ImgParams.extension
 
+        res_x, res_y = 0, 0
+        if self.use_scene_settings == '0':
+            res_x, res_y = ImgParams.res_x, ImgParams.res_y
+
         try:
             self.render_process = run_command_line_render(
-                self.render_scene_file, self.render_path, 3840, 2160,
+                self.render_scene_file, self.render_path, res_x, res_y,
                 self.version, LOGGER,
                 image_format=img_ext)
             LOGGER.info('Maya batch rendering started.')
@@ -240,7 +246,6 @@ class RunLayerCreationProcess(threading.Thread):
                 if not p % 10:  # Update on every 10 percent progress
                     img_num = 1 + round(p * 0.1)
                     send_message(f'COMMAND IMG_NUM {img_num}')
-                    send_message(f'COMMAND STATUS_NAME Rendering {int(percent):02d}%')
 
     def kill_process(self):
         if self.process:

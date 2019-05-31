@@ -22,6 +22,17 @@ def create_file_safe_name(filename: str) -> str:
 
 class OpenImageUtil:
     @classmethod
+    def get_image_resolution(cls, img_file: Path) -> (int, int):
+        img_input = cls._image_input(img_file)
+
+        if img_input:
+            res_x, res_y = img_input.spec().width, img_input.spec().height
+            img_input.close()
+            del img_input
+            return res_x, res_y
+        return 0, 0
+
+    @classmethod
     def premultiply_image(cls, img_pixels: np.array) -> np.array:
         """ Premultiply a numpy image with itself """
         a = cls.np_to_imagebuf(img_pixels)
@@ -53,14 +64,24 @@ class OpenImageUtil:
 
         return img_buf
 
-    @staticmethod
-    def read_image(img_file: Path, format: str=''):
+    @classmethod
+    def _image_input(cls, img_file: Path):
+        """ CLOSE the returned object after usage! """
         img_input = oiio.ImageInput.open(img_file.as_posix())
 
         if img_input is None:
             LOGGER.error('Error reading image: %s', oiio.geterror())
             return
+        return img_input
 
+    @classmethod
+    def read_image(cls, img_file: Path, format: str=''):
+        img_input = cls._image_input(img_file)
+
+        if not img_input:
+            return None
+
+        # Read out image data as numpy array
         img = img_input.read_image(format=format)
         img_input.close()
 

@@ -88,11 +88,7 @@ def setup_hw2():
     cmds.setAttr('hardwareRenderingGlobals.multiSampleCount', 16)
 
 
-def setup_mtoa():
-    mu.unlock_renderer('arnold')
-    mel.eval('loadPreferredRenderGlobalsPreset("arnold");')
-    mel.eval('mayaHasRenderSetup;')
-
+def setup_minimal_mtoa():
     # Load up defaultArnoldRenderOptions
     # this will also create defaultArnoldDisplayDriver etc. whose are necessary to set up AOVs
     from mtoa.core import createOptions
@@ -102,6 +98,18 @@ def setup_mtoa():
     # "aborting render pass setup:  received abort signal"
     # but no other obvious error messages
     cmds.setAttr("defaultArnoldRenderOptions.abortOnError", 0)
+
+    # Set arnold log verbosity to Info so we can grab info
+    # about rendering progress from console output
+    cmds.setAttr("defaultArnoldRenderOptions.log_verbosity", 2)
+
+
+def setup_mtoa():
+    mu.unlock_renderer('arnold')
+    mel.eval('loadPreferredRenderGlobalsPreset("arnold");')
+    mel.eval('mayaHasRenderSetup;')
+
+    setup_minimal_mtoa()
 
     # --- Setup Cryptomatte AOV ---
     import mtoa.aovs as aovs
