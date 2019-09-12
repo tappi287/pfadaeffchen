@@ -138,7 +138,7 @@ class MergeLayerByName:
     def _read_xml(self) -> dict:
         mapping = dict()
 
-        with open(self.pos_file.as_posix(), 'r') as f:
+        with open(self.pos_file.as_posix(), 'rb') as f:
             try:
                 et = etree.parse(f)
             except Exception as e:
