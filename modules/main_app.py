@@ -28,10 +28,11 @@ class PfadAeffchenApp(QtWidgets.QApplication):
     start_render_service_timeout.setInterval(2000)
 
     """ Main GUI Application """
-    def __init__(self, mod_dir, version, logger, logging_queue):
+    def __init__(self, mod_dir, version, logger, logging_queue, log_listener):
         super(PfadAeffchenApp, self).__init__(sys.argv)
         self.mod_dir, self.logging_queue = mod_dir, logging_queue
-        
+
+        self.log_listener = log_listener
         self.logger = logger
         
         # Create Main Window

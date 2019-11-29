@@ -48,10 +48,6 @@ _ = de.gettext
 
 #TODO: Exception hook for main and image watcher process
 #TODO: log image processor to Job log
-#TODO:  Reduce psd layer count, compare target_look values with look values
-#       create a dict of mappings target_look = source_look
-#       then merge either renderlayers or images
-#       less renderlayer would also greatly reduce render time
 #
 # pipenv 2018.5.18
 
@@ -124,7 +120,7 @@ def main():
     version = read_version(mod_dir)
     LOGGER.debug('Running version: %s', version)
 
-    app = PfadAeffchenApp(mod_dir, version, LOGGER, logging_queue)
+    app = PfadAeffchenApp(mod_dir, version, LOGGER, logging_queue, log_listener)
     result = app.exec_()
     LOGGER.debug('---------------------------------------')
     LOGGER.debug('Qt application finished with exitcode %s', result)

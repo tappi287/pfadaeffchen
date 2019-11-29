@@ -22,22 +22,22 @@
         You should have received a copy of the GNU General Public License
         along with Pfad Aeffchen.  If not, see <http://www.gnu.org/licenses/>.
 """
-import sys
 import os
+import sys
 import threading
 from datetime import datetime
-from multiprocessing import Process
 from functools import partial
-from gettext import translation
+from multiprocessing import Process
+
 from PyQt5 import QtCore, QtWidgets
 
-from modules.detect_lang import get_translation
 from modules.app_globals import AVAILABLE_RENDERER, SocketAddress, COMPATIBLE_VERSIONS
+from modules.detect_lang import get_translation
+from modules.gui_create_process import RunLayerCreationProcess
 from modules.gui_image_watcher_process import start_watcher
 from modules.gui_service_manager import ServiceManager
-from modules.gui_create_process import RunLayerCreationProcess
 from modules.job import Job
-from modules.setup_log import JobLogFile, setup_queued_logger
+from modules.setup_log import setup_queued_logger, do_rollover
 from modules.setup_paths import get_user_directory, get_maya_version
 from modules.socket_broadcaster import ServiceAnnouncer
 from modules.socket_client_3 import SendMessage
@@ -200,6 +200,12 @@ class ControlApp(QtCore.QObject, LedControl):
     announcer = None
 
     def __init__(self, app, ui, logging_queue):
+        """
+
+        :param modules.main_app.PfadAeffchenApp app:
+        :param ui:
+        :param logging_queue:
+        """
         super(ControlApp, self).__init__(ui=ui)
         global LOGGER
         LOGGER = setup_queued_logger(__name__, logging_queue)
@@ -310,7 +316,7 @@ class ControlApp(QtCore.QObject, LedControl):
             if output_dir:
                 self.socket_send.do('COMMAND RENDER_PATH ' + output_dir, SocketAddress.watcher)
 
-    def add_render_job(self, job_object):
+    def add_render_job(self, job_object: Job):
         """ Service Manager requests new job, scene file and render dir existence already confirmed """
         # This is a COPY of the actual service manager thread job class instance
         # Therefore we update our local copy -AND- signal all changes to the service
@@ -327,8 +333,6 @@ class ControlApp(QtCore.QObject, LedControl):
         self.update_status(msg)
         self.enable_gui(False)
 
-        # Create job log file and add handler for it
-        JobLogFile.setup(self.current_job.title)
         # Yellow LED blink
         self.led(1, 2, 2)
 
@@ -443,6 +447,9 @@ class ControlApp(QtCore.QObject, LedControl):
                 self.job_status,                # Update job status
                 )
 
+        # Start Jobs with a new log file
+        do_rollover(self.app.log_listener)
+
         self.layer_creation_thread = RunLayerCreationProcess(*args)
         self.layer_creation_thread.start()
         self.led(0, 0)
@@ -480,8 +487,8 @@ class ControlApp(QtCore.QObject, LedControl):
 
     def start_service_manager(self):
         """
-        Start service manager thread that handles all client communication and
-        job creation.
+            Start service manager thread that handles all client communication and
+            job creation.
         """
         LOGGER.info('Starting Service manager.')
         # Setup service manager
@@ -602,7 +609,7 @@ class ControlApp(QtCore.QObject, LedControl):
 
     def save_status_report(self):
         # Close job log file handle and save content for report
-        JobLogFile.finish()
+        self.current_job.log.finish()
 
         if not os.path.exists(self.current_job.render_dir):
             return
@@ -610,7 +617,7 @@ class ControlApp(QtCore.QObject, LedControl):
         # Report file path
         report_file = os.path.join(self.current_job.render_dir, 'report.html')
         # Append job log to report
-        self.ui.statusBrowser.append(JobLogFile.text_report)
+        self.ui.statusBrowser.append(self.current_job.log.text_report)
         html_data = str(self.ui.statusBrowser.toHtml())
 
         # Clear console
@@ -650,6 +657,9 @@ class ControlApp(QtCore.QObject, LedControl):
         # Abort running job
         if self.current_job != self.empty_job:
             self.abort_running_job()
+
+        # Close empty job log file
+        self.empty_job.log.finish()
 
         # End service announcer
         self.stop_render_service()

@@ -22,15 +22,24 @@
 import os
 import glob
 import logging
+
 try:
     # Available from Python >3.2
     from logging.handlers import QueueHandler, QueueListener
 except ImportError:
     pass
+
+try:
+    from logging.handlers import RotatingFileHandler
+except ImportError:
+    pass
+
 import logging.config
 from datetime import datetime
 from modules.app_globals import PFAD_AEFFCHEN_LOG_NAME
 from modules.setup_paths import get_user_directory
+
+LOG_FILE = os.path.join(get_user_directory(), PFAD_AEFFCHEN_LOG_NAME)
 
 
 def setup_log_file(log_file_name=PFAD_AEFFCHEN_LOG_NAME, delete_existing_log_files=False):
@@ -61,7 +70,7 @@ def setup_log_file(log_file_name=PFAD_AEFFCHEN_LOG_NAME, delete_existing_log_fil
                 'stream': 'ext://sys.stdout', 'formatter': 'simple'},
             'file': {
                 'level': 'DEBUG', 'class': 'logging.handlers.RotatingFileHandler',
-                'filename': os.path.join(usr_profile, log_file_name), 'maxBytes': 5000000, 'backupCount': 4,
+                'filename': LOG_FILE, 'maxBytes': 5000000, 'backupCount': 4,
                 'formatter': 'file_formatter',
                 },
             'null': {
@@ -94,79 +103,33 @@ def delete_existing_logs(log_file):
             print(e)
 
 
+def do_rollover(logger):
+    """ Do a roll over for this loggers RotatingFileHandler """
+    for handler in logger.handlers:
+        if type(handler) is RotatingFileHandler:
+            handler.doRollover()
+
+
 class JobLogFile(object):
-    fh = None            # Store file handler per job
-    current_path = None  # Store log file location per job
-    text_report = ''     # Store log file content as text
     usr_profile = get_user_directory()
     logger = None
 
-    # TODO: Add image watcher log entries
+    def __init__(self, job_title):
+        logging.info('Starting Job: {} at {}'.format(job_title, datetime.now().strftime('%Y-%m-%d_%H-%M-%S')))
+        self.text_report = ''
 
-    @classmethod
-    def _reset(cls):
-        cls.fh = None
-        cls.current_path = None
-        cls.text_report = ''
-
-    @classmethod
-    def setup(cls, job_title):
-        """ Add a job log file handler while a job is running """
-        cls._reset()
-
-        cls.logger = logging.getLogger('JobLogger')
-        cls.logger.setLevel(logging.DEBUG)
-
-        filename = datetime.now().strftime('Job_%Y-%m-%d_%H-%M-%S.log')
-        cls.current_path = os.path.join(cls.usr_profile, filename)
-
-        formatter = logging.Formatter(fmt='%(asctime)s %(module)s: %(message)s')
-
-        cls.fh = logging.FileHandler(cls.current_path)
-        cls.fh.setFormatter(formatter)
-
-        try:
-            logging.root.addHandler(cls.fh)
-            cls.logger.info('Starting job log for %s at %s', job_title, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        except Exception as e:
-            print(e)
-
-        return cls.fh
-
-    @classmethod
-    def finish(cls):
+    def finish(self):
         """ Remove file handler and prepare log file content for text browser report """
-        if cls.logger is None:
-            return
-
-        # Remove and close file handler
-        try:
-            cls.logger.removeHandler(cls.fh)
-            logging.root.removeHandler(cls.fh)
-            cls.fh.close()
-        except Exception as e:
-            cls.logger.error(e)
-            print(e)
-
         # Read log file contents
         try:
-            if cls.current_path:
-                with open(cls.current_path, 'r') as f:
-                    cls.text_report = f.read()
+            with open(LOG_FILE, 'r') as f:
+                self.text_report = f.read()
         except Exception as e:
-            cls.logger.error(e)
+            logging.warning(e)
             return
 
         # Format the text report as preformatted text
-        cls.text_report = '<h4>Job Log</h4><pre>{}</pre>'.format(cls.text_report)
-
-        # Remove job log file
-        if cls.current_path:
-            try:
-                os.remove(cls.current_path)
-            except Exception as e:
-                cls.logger.error(e)
-        cls.current_path = None
+        self.text_report = '<h4>Job Log</h4><pre>{}</pre>'.format(self.text_report)
 
 
 def setup_log_queue_listener(logger, queue):
@@ -177,7 +140,7 @@ def setup_log_queue_listener(logger, queue):
     """
     handler_ls = list()
     for handler in logger.handlers:
-        print('Removing handler that will be added to queue listener: ', str(handler))
+        logging.debug('Removing handler that will be added to queue listener: ', handler)
         handler_ls.append(handler)
 
     for handler in handler_ls:

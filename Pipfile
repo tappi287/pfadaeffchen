@@ -6,8 +6,8 @@ name = "pypi"
 [packages]
 qt-ledwidget = "==0.2"
 psutil = "==5.4.6"
-PyQt5 = "==5.12.2"
-pillow = "==6.2.0"
+PyQt5 = "==5.13.2"
+pillow = "==6.2.1"
 numpy = "==1.15.2"
 openimageio = {file = "https://piwigo.ilikeviecher.com/ftp-upload/packages/OpenImageIO-2.0.7-cp37-cp37m-win_amd64.whl"}
 mmh3 = "==2.5.1"
