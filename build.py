@@ -1,4 +1,5 @@
 import configparser
+import json
 import os
 import shutil
 from subprocess import Popen
@@ -6,29 +7,26 @@ from subprocess import Popen
 from modules.setup_paths import get_current_modules_dir
 
 # Nsis Config file to read wheels from
-# needs to be manually updated if new packages/wheels required!
+# needs to be manually updated if new packages required!
 CFG_FILE = os.path.join(get_current_modules_dir(), 'nsi', 'pfad_aeffchen.cfg')
 
 
-def update_nsis_pypi_wheels(cfg: configparser.ConfigParser, pip: configparser.ConfigParser):
-    pypi_wheels: str = cfg.get('Include', 'pypi_wheels')
-    str_wheels = pypi_wheels.split('\n')
+def update_nsis_pypi_wheels(cfg: configparser.ConfigParser, pip: dict):
+    str_wheels: str = cfg.get('Include', 'pypi_wheels')
+    str_wheels: list = str_wheels.split('\n')
     cfg_wheels = dict()
 
     print('Nsis wheels:', str_wheels)
-    print('Pip wheels: ', [p for p in pip.items('packages')])
-    pip_wheels = [p[0] for p in pip.items('packages')]
+    print('Pip wheels: ', [f'{n}{v.get("version")}' for n, v in pip['default'].items()])
 
     # Compare Nsis and Pip wheel versions and update cfg_wheels dict with pip versions
     for wheel in str_wheels:
         wheel_name, wheel_version = wheel.split('==')
         cfg_wheels[wheel_name] = wheel_version
 
-        if wheel_name.casefold() in pip_wheels:
-            pip_version = pip['packages'][wheel_name]  # Get the pip version
-            pip_version = pip_version.replace('"', '').replace("'", "")  # Remove " and ' from version string
-
-            if pip_version == '*':
+        if wheel_name.casefold() in pip['default']:
+            pip_version = pip['default'][wheel_name.casefold()].get('version')  # Get the pip version
+            if pip_version is None or pip_version == '*':
                 continue
 
             if pip_version.startswith('=='):
@@ -93,23 +91,22 @@ def main():
     rem_build_dir()
 
     # Pip wheel config Pipfile
-    pip_file = os.path.join(get_current_modules_dir(), 'Pipfile')
+    pip_lock_file = os.path.join(get_current_modules_dir(), 'Pipfile.lock')
 
     # Temporary config file to create during build process
     build_cfg = os.path.join(get_current_modules_dir(), 'pfad_aeffchen_build.cfg')
 
-    if not os.path.exists(CFG_FILE) or not os.path.exists(pip_file):
-        print('Pip or nsis cfg file not found ', CFG_FILE, pip_file)
+    if not os.path.exists(CFG_FILE) or not os.path.exists(pip_lock_file):
+        print('Pip or nsis cfg file not found ', CFG_FILE, pip_lock_file)
         return
 
     cfg = configparser.ConfigParser(allow_no_value=True)
-    pip = configparser.ConfigParser()
 
     with open(CFG_FILE, 'r') as f:
         cfg.read_file(f)
 
-    with open(pip_file, 'r') as f:
-        pip.read_file(f)
+    with open(pip_lock_file, 'r') as f:
+        pip = json.load(f)
 
     update_nsis_pypi_wheels(cfg, pip)
 
