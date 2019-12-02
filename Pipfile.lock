@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "a8fc03d569d08d1b5a81c485c92501e5e6ffc8b2a603849d607e60432741e6ee"
+            "sha256": "1b362d35ece7dc20740555b2a48e90498dc0162a2b7e732935dbe507bc75d332"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -293,6 +293,7 @@
                 "sha256:ef3c7a0bf78674b0dda86ff5809d8495019903a096c128e1f160984b37848f73",
                 "sha256:fabff832046643cdb93920ddaa8f77344df90768930fbe6bb33d211c4dcd0b5e"
             ],
+            "index": "pypi",
             "version": "==12.7.0"
         },
         "qt-ledwidget": {

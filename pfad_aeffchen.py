@@ -47,7 +47,6 @@ de.install()
 _ = de.gettext
 
 #TODO: Exception hook for main and image watcher process
-#TODO: log image processor to Job log
 #
 # pipenv 2018.5.18
 
@@ -56,7 +55,7 @@ def set_version(mod_dir):
     """ Write version info from pfad_aeffchen.cfg to resource directory
         to make it available to the installer version of the app aswell.
     """
-    cfg_file = os.path.join(mod_dir, 'pfad_aeffchen.cfg')
+    cfg_file = os.path.join(mod_dir, 'nsi', 'pfad_aeffchen.cfg')
     if not os.path.exists(cfg_file):
         LOGGER.info('%s does not exist.', cfg_file)
         # We're probably not in Dev environment
