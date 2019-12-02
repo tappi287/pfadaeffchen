@@ -103,33 +103,26 @@ def delete_existing_logs(log_file):
             print(e)
 
 
+def create_job_log_report():
+    """ Create a html report form the current log file contents """
+    text_report = ''
+
+    try:
+        with open(LOG_FILE, 'r') as f:
+            text_report = f.read()
+    except Exception as e:
+        logging.warning(e)
+        return ''
+
+    # Format the text report as preformatted text
+    return '<h4>Job Log</h4><pre>{}</pre>'.format(text_report)
+
+
 def do_rollover(logger):
     """ Do a roll over for this loggers RotatingFileHandler """
     for handler in logger.handlers:
         if type(handler) is RotatingFileHandler:
             handler.doRollover()
-
-
-class JobLogFile(object):
-    usr_profile = get_user_directory()
-    logger = None
-
-    def __init__(self, job_title):
-        logging.info('Starting Job: {} at {}'.format(job_title, datetime.now().strftime('%Y-%m-%d_%H-%M-%S')))
-        self.text_report = ''
-
-    def finish(self):
-        """ Remove file handler and prepare log file content for text browser report """
-        # Read log file contents
-        try:
-            with open(LOG_FILE, 'r') as f:
-                self.text_report = f.read()
-        except Exception as e:
-            logging.warning(e)
-            return
-
-        # Format the text report as preformatted text
-        self.text_report = '<h4>Job Log</h4><pre>{}</pre>'.format(self.text_report)
 
 
 def setup_log_queue_listener(logger, queue):

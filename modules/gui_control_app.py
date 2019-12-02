@@ -37,7 +37,7 @@ from modules.gui_create_process import RunLayerCreationProcess
 from modules.gui_image_watcher_process import start_watcher
 from modules.gui_service_manager import ServiceManager
 from modules.job import Job
-from modules.setup_log import setup_queued_logger, do_rollover
+from modules.setup_log import setup_queued_logger, do_rollover, create_job_log_report
 from modules.setup_paths import get_user_directory, get_maya_version
 from modules.socket_broadcaster import ServiceAnnouncer
 from modules.socket_client_3 import SendMessage
@@ -447,7 +447,7 @@ class ControlApp(QtCore.QObject, LedControl):
                 self.job_status,                # Update job status
                 )
 
-        # Start Jobs with a new log file
+        # Start every Job with a new log file
         do_rollover(self.app.log_listener)
 
         self.layer_creation_thread = RunLayerCreationProcess(*args)
@@ -608,8 +608,8 @@ class ControlApp(QtCore.QObject, LedControl):
         LOGGER.debug('Job button request: %s - %s', job.title, job_request)
 
     def save_status_report(self):
-        # Close job log file handle and save content for report
-        self.current_job.log.finish()
+        # Save current log file contents as job report
+        report = create_job_log_report()
 
         if not os.path.exists(self.current_job.render_dir):
             return
@@ -617,7 +617,7 @@ class ControlApp(QtCore.QObject, LedControl):
         # Report file path
         report_file = os.path.join(self.current_job.render_dir, 'report.html')
         # Append job log to report
-        self.ui.statusBrowser.append(self.current_job.log.text_report)
+        self.ui.statusBrowser.append(report)
         html_data = str(self.ui.statusBrowser.toHtml())
 
         # Clear console
@@ -657,9 +657,6 @@ class ControlApp(QtCore.QObject, LedControl):
         # Abort running job
         if self.current_job != self.empty_job:
             self.abort_running_job()
-
-        # Close empty job log file
-        self.empty_job.log.finish()
 
         # End service announcer
         self.stop_render_service()

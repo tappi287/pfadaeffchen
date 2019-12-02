@@ -19,16 +19,14 @@
         along with Pfad Aeffchen.  If not, see <http://www.gnu.org/licenses/>.
 """
 from datetime import datetime
-from typing import Union
 
 from modules.detect_lang import get_translation
-from modules.setup_log import JobLogFile
 
 de = get_translation()
 _ = de.gettext
 
 
-class Job(object):
+class Job:
     """ Holds information about a render job """
     status_desc_list = [_('Warteschlange'), _('Szene wird vorbereitet'),
                         _('Rendering'), _('Bilderkennung'),
@@ -64,9 +62,6 @@ class Job(object):
 
         # Index in Service Manager Job queue
         self.remote_index = 0
-
-        # Prepare logger
-        self.log = JobLogFile(self.title)
 
         self.__img_num = 0
         self.total_img_num = 0
