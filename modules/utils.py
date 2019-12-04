@@ -1,8 +1,9 @@
 #! usr/bin/python_3
-
+import os
 import re
+import shutil
 from pathlib import Path
-from typing import List
+from typing import List, Union, Tuple
 
 import OpenImageIO as oiio
 import numpy as np
@@ -11,6 +12,7 @@ from lxml import etree
 from modules.setup_log import setup_logging
 from OpenImageIO import ImageBufAlgo, ImageSpec, ImageBuf, ImageOutput
 
+from modules.setup_paths import get_user_directory
 
 LOGGER = setup_logging(__name__)
 
@@ -113,6 +115,30 @@ class OpenImageUtil:
         output.close()
 
 
+def find_deltagen_scene_pos_file(scene_file: Union[str, Path]) -> Union[Path, None]:
+    scene_file = Path(scene_file)
+    pos_file = scene_file.with_suffix('.pos')
+
+    if pos_file.exists():
+        return pos_file
+
+
+def find_deltagen_scene_texture_path_file(scene_file: Union[str, Path]) -> Union[Path, None]:
+    scene_file = Path(scene_file)
+    tp_file = scene_file.with_suffix('.csb.texturePath')
+
+    if tp_file.exists():
+        return tp_file
+
+
+def scene_file_to_render_scene_file(scene_file):
+    """ Scene_file.abc -> Scene_file_render.mb """
+    base_dir = os.path.dirname(scene_file)
+    scene_name = os.path.splitext(os.path.basename(scene_file))[0]
+    render_scene_name = scene_name + '_render.mb'
+    return os.path.join(base_dir, render_scene_name)
+
+
 class MergeLayerByName:
     """
         Identify layers matching the name of their DeltaGen origin target look
@@ -127,10 +153,10 @@ class MergeLayerByName:
     def __init__(self, layer_names: List[str], scene_file: Path):
         self.layer_names = layer_names
         self.scene_file = Path(scene_file)
-        self.pos_file = self.scene_file.with_suffix('.pos')
+        self.pos_file = find_deltagen_scene_pos_file(scene_file)
 
     def create_layer_mapping(self) -> dict:
-        if not self.pos_file.exists():
+        if self.pos_file is None or not self.pos_file.exists():
             return dict()
 
         return self._read_xml()
@@ -155,3 +181,114 @@ class MergeLayerByName:
                     self.layer_names.remove(actor.text)
 
         return mapping
+
+
+class MoveJobSceneFile:
+    job_dir_number = 0
+    job_dir_name = 'jobdir_'
+    local_work_dir = None
+
+    @classmethod
+    def _file_to_local_work_dir_file(cls, file):
+        """ Move file location to local work dir """
+        scene_dir = os.path.join(cls.local_work_dir, f'{cls.job_dir_name}{cls.job_dir_number:03d}')
+        cls.create_dir(scene_dir)
+
+        return os.path.join(scene_dir, os.path.split(os.path.basename(file))[1])
+
+    @classmethod
+    def get_local_work_dir(cls) -> str:
+        if not cls.local_work_dir:
+            cls.local_work_dir = cls.create_local_work_dir()
+
+            if not os.path.exists(cls.local_work_dir):
+                return str()
+
+        return cls.local_work_dir
+
+    @classmethod
+    def move_scene_file_to_local_location(cls, scene_file: str) -> str:
+        if not cls.get_local_work_dir():
+            return str()
+
+        pos_file, texture_path_file = cls.get_additional_scene_files(scene_file)
+        cls.job_dir_number += 1
+
+        try:
+            result = shutil.copy(scene_file, cls._file_to_local_work_dir_file(scene_file))
+            LOGGER.info('Copied scene file to local working directory: %s', result)
+
+            if pos_file:
+                pos_file = pos_file.as_posix()
+                result = shutil.copy(pos_file, cls._file_to_local_work_dir_file(pos_file))
+                LOGGER.info('Copied POS scene file to local working directory: %s', result)
+
+            if texture_path_file:
+                texture_path_file = texture_path_file.as_posix()
+                result = shutil.copy(texture_path_file, cls._file_to_local_work_dir_file(texture_path_file))
+                LOGGER.info('Copied texturePath scene file to local working directory: %s', result)
+        except Exception as e:
+            LOGGER.warning('Could not copy files to local destination: %s', e)
+            return str()
+
+        LOGGER.info('Updated scene file location: %s', cls._file_to_local_work_dir_file(scene_file))
+        return cls._file_to_local_work_dir_file(scene_file)
+
+    @classmethod
+    def delete_local_scene_files(cls, scene_file):
+        local_work_dir = cls.get_local_work_dir()
+        if not local_work_dir:
+            return
+
+        if Path(scene_file).parent.parent != Path(local_work_dir):
+            LOGGER.warning('Tried to delete local job files but job scene file '
+                           'path is outside local working directory!\n'
+                           'Job dir: %s\n'
+                           'local dir: %s\n',
+                           Path(scene_file.parent.parent), Path(local_work_dir))
+            return
+
+        cls.delete_local_dir(Path(scene_file).parent)
+        LOGGER.info('Deleted local scene file directory: %s', Path(scene_file).parent)
+
+    @classmethod
+    def create_local_work_dir(cls) -> str:
+        local_work_dir = os.path.join(get_user_directory(), '_work')
+        if cls.create_dir(local_work_dir):
+            return local_work_dir
+
+        return str()
+
+    @staticmethod
+    def create_dir(directory_path) -> bool:
+        try:
+            if not os.path.exists(directory_path):
+                os.mkdir(directory_path)
+        except Exception as e:
+            LOGGER.warning('Could not create or access directory: %s', e)
+            return False
+        return True
+
+    @classmethod
+    def clear_local_work_dir(cls):
+        """ Deletes and re-create a clean local work directory """
+        local_work_dir = cls.get_local_work_dir()
+        if not local_work_dir:
+            return
+
+        cls.delete_local_dir(local_work_dir)
+        cls.local_work_dir = cls.create_local_work_dir()
+
+    @staticmethod
+    def delete_local_dir(directory):
+        try:
+            if os.path.exists(directory):
+                shutil.rmtree(directory)
+        except Exception as e:
+            LOGGER.warning(e)
+
+    @staticmethod
+    def get_additional_scene_files(scene_file) -> Tuple[Union[Path, None], Union[Path, None]]:
+        pos_file = find_deltagen_scene_pos_file(scene_file)
+        texture_path_file = find_deltagen_scene_texture_path_file(scene_file)
+        return pos_file, texture_path_file

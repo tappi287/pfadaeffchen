@@ -28,10 +28,12 @@ import threading
 
 from PyQt5 import QtCore
 
+from maya_mod.socket_client import send_message
 from maya_mod.start_command_line_render import run_command_line_render
 from maya_mod.start_mayapy import run_module_in_standalone
-from maya_mod.socket_client import send_message
 from modules.app_globals import ImgParams
+from modules.job import JobStatus
+from modules.utils import scene_file_to_render_scene_file
 
 
 def log_subprocess_output(pipe, out_signal=None):
@@ -78,6 +80,7 @@ class RunLayerCreationProcess(threading.Thread):
         self.module_dir, self.version = module_dir, version
         self.renderer, self.ignoreHidden = use_renderer, ignore_hidden
         self.delete_hidden, self.use_scene_settings = delete_hidden, use_scene_settings
+        self.local_work_dir = None
 
         # Prepare signals
         self.signals = RunLayerCreationSignals()
@@ -90,11 +93,8 @@ class RunLayerCreationProcess(threading.Thread):
 
         self.signals.render_output_sig.connect(self.check_arnold_render_output)
 
-        # Render scene file
-        base_dir = os.path.dirname(self.scene_file)
-        scene_name = os.path.splitext(os.path.basename(self.scene_file))[0]
-        render_scene_name = scene_name + '_render.mb'
-        self.render_scene_file = os.path.join(base_dir, render_scene_name)
+        # Render scene file _render.mb
+        self.render_scene_file = scene_file_to_render_scene_file(scene_file)
 
         # Prepare workers
         self.process = None
@@ -114,7 +114,7 @@ class RunLayerCreationProcess(threading.Thread):
             return
 
         # Set job status to scene creation
-        self.signals.update_job_status.emit(1)
+        self.signals.update_job_status.emit(JobStatus.scene_loading)
 
         # Wait until Layer creation finished or aborted
         while not self.event.is_set():
@@ -133,7 +133,7 @@ class RunLayerCreationProcess(threading.Thread):
         self.start_batch_render()
 
         # Set job status to rendering
-        self.signals.update_job_status.emit(2)
+        self.signals.update_job_status.emit(JobStatus.rendering)
 
         # Wait until Batch rendering finished or aborted
         while not self.event.is_set():

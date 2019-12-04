@@ -36,7 +36,7 @@ from modules.detect_lang import get_translation
 from modules.gui_create_process import RunLayerCreationProcess
 from modules.gui_image_watcher_process import start_watcher
 from modules.gui_service_manager import ServiceManager
-from modules.job import Job
+from modules.job import Job, JobStatus
 from modules.setup_log import setup_queued_logger, do_rollover, create_job_log_report
 from modules.setup_paths import get_user_directory, get_maya_version
 from modules.socket_broadcaster import ServiceAnnouncer
@@ -344,13 +344,13 @@ class ControlApp(QtCore.QObject, LedControl):
         self.ui.lineEditSubnet.setEnabled(False)
 
         if self.ui.enableQueue.isChecked():
-            if self.current_job.status > 3:
+            if self.current_job.status > 4:
                 # Skip job if finished, failed, aborted
                 self.job_finished()
                 return
 
             # Set job status to scene loading/editing
-            self.job_status(1)
+            self.job_status(JobStatus.scene_loading)
             self.start_image_watcher_process()
             self.start_render_process()
 
@@ -392,7 +392,7 @@ class ControlApp(QtCore.QObject, LedControl):
     def watcher_create_psd(self):
         """ Finalize the job, continue detecting empty rendering results and create PSD """
         # Set job status to image detection
-        self.job_status(3)
+        self.job_status(JobStatus.image_detection)
 
         if self.watcher:
             if self.watcher.is_alive():
@@ -418,7 +418,7 @@ class ControlApp(QtCore.QObject, LedControl):
         msg = f'<span style="color:red;"><b>{self.current_job.title} wurde vom Benutzer abgebrochen.</b></span>'
         self.update_status(msg)
         self.job_aborted = True
-        self.job_status(6)
+        self.job_status(JobStatus.aborted)
 
         if self.layer_creation_thread:
             if self.layer_creation_thread.is_alive():

@@ -23,27 +23,32 @@
         You should have received a copy of the GNU General Public License
         along with Pfad Aeffchen.  If not, see <http://www.gnu.org/licenses/>.
 """
-import os
-import socket
 import copy
 import json
+import os
+import socket
 from datetime import datetime, timedelta
-from PyQt5.QtCore import QThread, pyqtSignal, QTimer
+
+from PyQt5.QtCore import QThread, pyqtSignal, QTimer, pyqtSlot
 from PyQt5.QtCore import Qt
 
-from modules.job import Job
-from modules.setup_log import setup_queued_logger
-from modules.detect_lang import get_translation
-from modules.setup_paths import get_user_directory, create_unique_render_path
+from modules.app_globals import AVAILABLE_RENDERER
 from modules.app_globals import SocketAddress, JOB_DATA_EOS
+from modules.detect_lang import get_translation
+from modules.file_transfer import JobFileTransfer
+from modules.job import Job, JobStatus
+from modules.setup_log import setup_queued_logger, setup_logging
+from modules.setup_paths import get_user_directory, create_unique_render_path
 from modules.socket_broadcaster import get_valid_network_address
 from modules.socket_server import run_service_manager_server as rsm_server
-from modules.app_globals import AVAILABLE_RENDERER
-
 # translate strings
+from modules.utils import MoveJobSceneFile
+
 de = get_translation()
 de.install()
 _ = de.gettext
+
+LOGGER = setup_logging(__name__)
 
 
 def copy_job(job):
@@ -87,8 +92,8 @@ class ServiceManager(QThread):
 
     def __init__(self, control_app, app, ui, logging_queue):
         super(ServiceManager, self).__init__()
-        global LOGGER
-        LOGGER = setup_queued_logger(__name__, logging_queue)
+        # global LOGGER
+        # LOGGER = setup_queued_logger(__name__, logging_queue)
 
         self.control_app, self.app, self.ui = control_app, app, ui
 
@@ -154,6 +159,13 @@ class ServiceManager(QThread):
 
         LOGGER.info('Service manager available at %s - %s', self.address[0], self.hostname)
 
+        # Clean local work directory
+        try:
+            MoveJobSceneFile.clear_local_work_dir()
+        except Exception as e:
+            LOGGER.error('Error cleaning local work directory: %s', e)
+        LOGGER.info('Service manager cleaned up local work directory.')
+
         # Run thread event loop
         self.exec()
 
@@ -167,23 +179,24 @@ class ServiceManager(QThread):
     def validate_queue(self):
         """ Test if job items have expired """
         for job in self.job_queue:
-            if job.status < 4:
+            if job.status < JobStatus.finished:
                 # Skip unfinished or queued jobs
                 continue
 
             created = datetime.fromtimestamp(job.created)
             if (datetime.now() - created) > timedelta(hours=24):
+                self._clear_local_job_file(job)
                 self.job_queue.remove(job)
 
         # Update Remote Index
         for idx, job in enumerate(self.job_queue):
             job.remote_index = idx
 
-    def prepare_queue_transfer(self, queue):
+    def prepare_queue_transfer(self):
         """ Transfer the job queue to the client as serialized json dictonary """
         if not self.transfer_cache:
             # Create serialized queue byte encoded
-            serialized_queue = self.serialize_queue(queue)
+            serialized_queue = self.serialize_queue(self.job_queue)
             serialized_queue = serialized_queue.encode(encoding='utf-8')
             # Cache the result
             self.cache_transfer_queue(serialized_queue)
@@ -223,6 +236,19 @@ class ServiceManager(QThread):
         if self.transfer_cache:
             LOGGER.debug('Invalidating transfer cache.')
             self.transfer_cache = b''
+
+    def start_job_file_transfer(self, job: Job):
+        LOGGER.debug('Starting Job File Transfer for %s', job.title)
+        file_transfer = JobFileTransfer(self, self._file_transfer_finished, job)
+        file_transfer.start()
+
+    @pyqtSlot(Job)
+    def _file_transfer_finished(self, job: Job):
+        self.replace_job_in_queue(job, self.job_queue)
+        self.job_working_queue.append(job)
+
+        LOGGER.debug('Finished Job File Transfer for %s', job.title)
+        self.start_job()
 
     def job_finished(self):
         """ Called from app if last job finished """
@@ -271,12 +297,11 @@ class ServiceManager(QThread):
             return False
 
         self.invalidate_transfer_cache()
-        self.job_working_queue.append(job_item)
 
         job_item.remote_index = len(self.job_queue)
         self.job_queue.append(job_item)
         self.job_widget_signal.emit(job_item)
-        self.start_job()
+        self.start_job_file_transfer(job_item)
 
         return True
 
@@ -294,8 +319,8 @@ class ServiceManager(QThread):
         self.invalidate_transfer_cache()
 
     def move_job(self, job, to_top=True):
-        self.update_queue(job, self.job_working_queue, to_top)
-        new_idx = self.update_queue(job, self.job_queue, to_top)
+        self.update_queue_order(job, self.job_working_queue, to_top)
+        new_idx = self.update_queue_order(job, self.job_queue, to_top)
 
         if new_idx:
             job.remote_index = new_idx
@@ -308,7 +333,7 @@ class ServiceManager(QThread):
                 break
 
         if job_in_progress:
-            self.update_queue(job_in_progress, self.job_queue, True)
+            self.update_queue_order(job_in_progress, self.job_queue, True)
 
         self.update_control_app_job_widget()
 
@@ -324,14 +349,17 @@ class ServiceManager(QThread):
 
     def set_job_failed(self):
         self.current_job.set_failed()
+        self._clear_local_job_file(self.current_job)
         self.invalidate_transfer_cache()
 
     def set_job_canceled(self):
         self.current_job.set_canceled()
+        self._clear_local_job_file(self.current_job)
         self.invalidate_transfer_cache()
 
     def set_job_finished(self):
         self.current_job.set_finished()
+        self._clear_local_job_file(self.current_job)
         self.invalidate_transfer_cache()
 
     def set_job_status(self, status: int):
@@ -350,7 +378,15 @@ class ServiceManager(QThread):
         self.invalidate_transfer_cache()
 
     @staticmethod
-    def update_queue(job_item, list_queue, to_top):
+    def replace_job_in_queue(job_item, job_queue) -> bool:
+        if job_item.remote_index > len(job_queue):
+            return False
+
+        job_queue[job_item.remote_index] = job_item
+        return True
+
+    @staticmethod
+    def update_queue_order(job_item, list_queue, to_top):
         new_idx = None
 
         if to_top:
@@ -365,11 +401,18 @@ class ServiceManager(QThread):
 
         return new_idx
 
+    @staticmethod
+    def _clear_local_job_file(job):
+        if not job.scene_file_is_local:
+            return
+
+        MoveJobSceneFile.delete_local_scene_files(job.file)
+
     def is_queue_finished(self):
         """ Return True if all jobs in the queue are finished """
         finished = False
         for job in self.job_queue:
-            if job.status < 4:
+            if job.status < JobStatus.finished:
                 break
         else:
             # No unfinished jobs in the queue, mark queue finished
@@ -378,6 +421,13 @@ class ServiceManager(QThread):
                 finished = True
 
         return finished
+
+    def is_file_in_transfer(self):
+        for job in self.job_queue:
+            if job.status == JobStatus.file_transfer:
+                return True
+
+        return False
 
     def get_job_from_index(self, idx):
         job = None
@@ -405,7 +455,7 @@ class ServiceManager(QThread):
             except ValueError:
                 version = 0
 
-            if version and version > 1:
+            if version and version > 2:
                 LOGGER.info('Client with version %s connected.', version)
                 response = _('Render Dienst verfuegbar @ {} '
                              'Maya Version: {}').format(self.hostname, self.ui.comboBox_version.currentText())
@@ -413,7 +463,7 @@ class ServiceManager(QThread):
                 LOGGER.info('Invalid Client version connected!')
                 response = _('Render Dienst verfuegbar @ {}<br>'
                              '<span style="color:red;">Die Client Version wird nicht unterstuetzt! '
-                             'RenderKnecht Aktualisierung erforderlich!</span>').format(self.hostname)
+                             'Client Aktualisierung erforderlich!</span>').format(self.hostname)
 
         # ----------- TRANSFER RENDERER ------------
         elif msg == 'GET_RENDERER':
@@ -450,7 +500,7 @@ class ServiceManager(QThread):
         # ----------- TRANSFER JOB QUEUE ------------
         elif msg == 'GET_JOB_DATA':
             # Send the queue as serialized JSON
-            response = self.prepare_queue_transfer(self.job_queue)
+            response = self.prepare_queue_transfer()
 
         # ----------- MOVE JOB ------------
         elif msg.startswith('MOVE_JOB'):
@@ -466,13 +516,15 @@ class ServiceManager(QThread):
             if job_index:
                 job = self.get_job_from_index(int(job_index))
 
-            if job:
+            if job and not self.is_file_in_transfer():
                 try:
                     self.move_job(job, to_top)
                     response = _('{} in Warteschlange bewegt.').format(job.title)
                 except Exception as e:
                     LOGGER.error(e)
                     response = _('Job mit index {} konnte nicht bewegt werden.').format(job_index)
+            else:
+                response = _('Jobs können nicht bewegt werden während laufenden Dateitransfers.')
 
         # ----------- CANCEL JOB ------------
         elif msg.startswith('CANCEL_JOB'):

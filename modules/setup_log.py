@@ -82,6 +82,10 @@ def setup_log_file(log_file_name=PFAD_AEFFCHEN_LOG_NAME, delete_existing_log_fil
                 'handlers': ['file', 'console'], 'propagate': False, 'level': 'INFO', },
             'watcher_logger': {
                 'handlers': ['file', 'console'], 'propagate': False, 'level': 'DEBUG', },
+            # Module loggers
+            '': {
+                'handlers': ['file', 'console'], 'propagate': False, 'level': 'DEBUG',
+            }
             }
         }
 
@@ -133,7 +137,7 @@ def setup_log_queue_listener(logger, queue):
     """
     handler_ls = list()
     for handler in logger.handlers:
-        logging.debug('Removing handler that will be added to queue listener: ', handler)
+        logging.debug('Removing handler that will be added to queue listener: %s', handler)
         handler_ls.append(handler)
 
     for handler in handler_ls:

@@ -26,9 +26,22 @@ de = get_translation()
 _ = de.gettext
 
 
+class JobStatus:
+    """ Defines Job status for use in local modules """
+    # 0 - file transfer, 1 - queue, 2 - scene editing, 3 - rendering, 4 - Image detection, 5 - finished, 6 - failed
+    file_transfer = 0
+    queued = 1
+    scene_loading = 2
+    rendering = 3
+    image_detection = 4
+    finished = 5
+    failed = 6
+    aborted = 7
+
+
 class Job:
     """ Holds information about a render job """
-    status_desc_list = [_('Warteschlange'), _('Szene wird vorbereitet'),
+    status_desc_list = [_('Datentransfer'), _('Warteschlange'), _('Szene wird vorbereitet'),
                         _('Rendering'), _('Bilderkennung'),
                         _('Abgeschlossen'), _('Fehlgeschlagen'), _('Abgebrochen')]
     combo_box_items = [_('Zum Anfang der Warteschlange'), _('Ans Ende der Warteschlange'), _('Abbrechen')]
@@ -38,7 +51,11 @@ class Job:
                  ignore_hidden_objects='1', maya_delete_hidden='1', use_scene_settings='0',
                  client='Server'):
         self.title = job_title
-        self.file = scene_file
+
+        self.remote_file = scene_file  # available for clients to locate scene file
+        self.local_file = ''  # will be set after file transfer
+        self._file = scene_file  # file property
+
         self.render_dir = render_dir
         self.renderer = renderer
 
@@ -52,7 +69,7 @@ class Job:
         self.use_scene_settings = use_scene_settings
 
         # Class version
-        self.version = 1
+        self.version = 2
 
         # Client hostname
         self.client = client
@@ -63,14 +80,30 @@ class Job:
         # Index in Service Manager Job queue
         self.remote_index = 0
 
+        # File transfer status in Service Manager Job queue
+        self.scene_file_is_local = False
+
         self.__img_num = 0
         self.total_img_num = 0
         self.__progress = 0
 
-        # Status 0 - queue, 1 - scene editing, 2 - rendering, 3 - Image detection, 4 - finished, 5 - failed
+        # Status
+        # 0 - file transfer, 1 - queue, 2 - scene editing, 3 - rendering, 4 - Image detection, 5 - finished, 6 - failed
         self.__status = 0
         self.status_name = self.status_desc_list[self.__status]
         self.in_progress = False
+
+    @property
+    def file(self):
+        """ Return scene file location, preferring local scene file """
+        if self.local_file:
+            return self.local_file
+        else:
+            return self._file
+
+    @file.setter
+    def file(self, value):
+        self._file = value
 
     @property
     def img_num(self):
@@ -88,27 +121,25 @@ class Job:
 
     @status.setter
     def status(self, status: int=0):
-        if 0 < status < 4:
+        if 1 < status < 5:
             self.in_progress = True
-        elif 3 < status < 1:
+        elif 4 < status < 2:
             self.in_progress = False
 
         # Status failed/aborted
-        if status > 4:
+        if status > 5:
             self.progress = 0
 
         # Status finished
-        if status == 4:
+        if status == 5:
             self.progress = 100
 
         self.__status = status
 
         if status > len(self.status_desc_list):
-            status_desc = _('Unbekannt')
+            self.status_name = _('Unbekannt')
         else:
-            status_desc = self.status_desc_list[status]
-
-        self.status_name = status_desc
+            self.status_name = self.status_desc_list[status]
 
     @property
     def progress(self):
@@ -125,28 +156,28 @@ class Job:
         self.in_progress = False
 
         # Canceled jobs should not appear as failed
-        if self.status != 6:
-            self.status = 5
+        if self.status != 7:
+            self.status = 6
 
     def set_canceled(self):
         self.set_failed()
-        self.status = 6
+        self.status = 7
 
     def set_finished(self):
-        if self.status >= 5:
+        if self.status >= 6:
             # Failed or aborted job can not be finished
             return
 
         self.progress = 100
         self.in_progress = False
-        self.status = 4
+        self.status = 5
 
     def update_progress(self):
-        if self.status > 3:
+        if self.status > 4:
             return
 
         # Display number of rendered images
-        if self.status == 2:
+        if self.status == 3:
             if self.img_num and self.total_img_num:
                 self.status_name = _('{0:03d}/{1:03d} Layer erstellt').format(self.img_num, self.total_img_num)
 
