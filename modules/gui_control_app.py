@@ -258,7 +258,6 @@ class ControlApp(QtCore.QObject, LedControl):
         if not self.render_path:
             self.render_path = get_user_directory()
 
-        self.start_image_watcher_process()
         self.start_service_manager()
 
     def update_valid_ip_subnet_patterns(self, msg=''):
@@ -287,8 +286,7 @@ class ControlApp(QtCore.QObject, LedControl):
                 self.update_watcher(self.current_job.file, self.current_job.render_dir)
                 return
             else:
-                self.socket_send.do('COMMAND CLOSE', SocketAddress.watcher)
-                self.watcher.join()
+                self.exit_image_watcher_process()
 
         if self.current_job:
             render_path = self.current_job.render_dir
@@ -307,6 +305,17 @@ class ControlApp(QtCore.QObject, LedControl):
                                                            )
                                )
         self.watcher.start()
+
+    def exit_image_watcher_process(self):
+        if self.watcher:
+            if self.watcher.is_alive():
+                LOGGER.debug('Shutting down image processing server.')
+                self.socket_send.do('COMMAND CLOSE', SocketAddress.watcher)
+                self.watcher.join()
+                LOGGER.debug('Image processing server shut down.')
+                self.update_status(_('Bild Beobachter beendet.'))
+                del self.watcher
+                self.watcher = None
 
     def update_watcher(self, scene_file=None, output_dir=None):
         """ Update Image Watcher environment if it is running """
@@ -380,6 +389,7 @@ class ControlApp(QtCore.QObject, LedControl):
 
         self.update_progress(reset=False)
         self.update_progress(reset=True)
+        self.exit_image_watcher_process()
 
         self.queue_next_job_signal.emit()
 
@@ -679,10 +689,4 @@ class ControlApp(QtCore.QObject, LedControl):
             self.update_status(_('Socket Empfangs Server beendet.'))
 
         # End watcher process
-        if self.watcher:
-            if self.watcher.is_alive():
-                LOGGER.debug('Shutting down image processing server.')
-                self.socket_send.do('COMMAND CLOSE', SocketAddress.watcher)
-                self.watcher.join()
-                LOGGER.debug('Image processing server shut down.')
-                self.update_status(_('Bild Beobachter beendet.'))
+        self.exit_image_watcher_process()

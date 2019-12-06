@@ -155,8 +155,8 @@ class ImageFileWatcher(QtCore.QThread):
         self.directory = FileDirectoryWorker()
 
         # Timers
-        self.unprocessed_imgs_timer = None
-        self.watch_timer = None
+        self.unprocessed_imgs_timer = QtCore.QTimer()
+        self.watch_timer = QtCore.QTimer()
 
         # Setup event loop specific timers inside thread event loop
         self.started.connect(self.initialize_event_loop)
@@ -243,8 +243,6 @@ class ImageFileWatcher(QtCore.QThread):
         LOGGER.debug('Unprocessed Timout Timer: %s', self.unprocessed_imgs_timer.remainingTime())
 
         LOGGER.info('Image File Watcher thread event loop started.')
-        if self.watch_active:
-            self.initial_directory_index()
 
     def reset(self):
         self.unprocessed_imgs_timer.stop()

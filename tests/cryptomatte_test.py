@@ -21,8 +21,8 @@ def alpha_over(a: float, b: float):
 
 def main():
     start_time = time.time()
-    output_dir = Path(r'I:\Nextcloud\py\maya_scripts\_test_scene\render_output\AU32X_Q3_1558453812_4317')
-    scene = Path(r'I:\Nextcloud\py\maya_scripts\_test_scene\render_output\AU32X_Q3_1558453812_4317\AU32X_Q3SB_2020_01_NG_F_07_20190423_Poly_EXT_sta.csb')
+    output_dir = Path(r'D:\temp\crypto_test')
+    scene = Path(r'z:\__Audi\__Konfigurator\__A5_Familie\XXXXX_RS5_PA_NeMo\C_3D-Daten\AU49X_A5PA_2020_04_ND_F_01_20190910_POLY\AU49X_A5PA_2020_04_ND_F_01_20190910_POLY.csb')
     mod_dir = get_current_modules_dir()
     psd_creation_module = Path(mod_dir) / 'maya_mod/run_create_psd.py'
     psd_file = output_dir / f'{scene.stem}.psd'

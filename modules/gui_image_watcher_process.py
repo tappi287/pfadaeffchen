@@ -165,6 +165,9 @@ class WatcherApp(QtWidgets.QApplication):
         self.image_watcher.start(priority=QtCore.QThread.LowPriority)
         LOGGER.info('Image Watcher Thread started.')
 
+        self.change_watch_scene(self.scene_file)
+        self.change_watch_dir(self.watch_dir)
+
     def stop_image_watcher(self):
         LOGGER.debug('Stopping Image File Watcher Thread.')
         if self.image_watcher:
